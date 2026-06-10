@@ -10,7 +10,7 @@ Use [Conventional Commits](https://www.conventionalcommits.org/):
 
 **Types:** `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `style`, `chore`
 
-**Scopes:** `config`, `engine`, `entities`, `metrics`, `arrivals`, `lifecycle`, `monitor`, `release`
+**Scopes:** `config`, `engine`, `entities`, `metrics`, `arrivals`, `lifecycle`, `monitor`, `release`, `kiosk`, `patience`, `registry`
 
 **Examples:**
 ```
@@ -49,15 +49,18 @@ refactor(metrics): extract report formatting into helper
 - **No comments** in source code — let types and naming speak
 - **No emojis** in code, commit messages, or docs
 - **One concern per file** — the existing module structure must be preserved
-- **All simulation parameters** go in `src/config.py` — never hardcode magic numbers elsewhere
+- **All simulation parameters** go in `config.json` — never hardcode magic numbers elsewhere. `src/config.py` reads from JSON at runtime.
 - **Imports**: stdlib → third-party → local, separated by blank lines
 
 ## Adding a New Scenario
 
-1. Add new parameter fields to `Config` in `src/config.py`
-2. If a new resource is needed, create an entity wrapper under `src/entities/`
-3. If a new process step is needed, add it to the lifecycle in `src/engine/lifecycle.py`
+1. Add new parameter fields to `config.json` and expose them as `@property` in `src/config.py`
+2. If a new resource is needed, create an entity wrapper under `src/entities/` extending `ResourceManager`
+3. If a new process step is needed:
+   - Write a step function in `src/engine/stages.py`
+   - Register it in `BUILTIN_STAGES` or `EXPERIMENTAL_STAGES` in `src/engine/registry.py`
+   - Insert its key into the pipeline in `src/engine/lifecycle.py`
 4. Add any new KPIs to `Metrics` in `src/metrics.py`
-5. Wire everything in `src/main.py`
+5. Wire new resources in `src/main.py`
 
 No parameter or logic change should require editing more than 2–3 files.

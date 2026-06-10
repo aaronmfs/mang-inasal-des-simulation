@@ -1,0 +1,126 @@
+{
+  "_schema_version": "1.0",
+  "features": {
+    "customer_patience_and_abandonment": true,
+    "server_resource_bottleneck": true,
+    "kiosk_experimental_mode": false
+  },
+  "simulation_hours": 16,
+  "random_seed": 42,
+  "cashier_count": 3,
+  "cook_count": 10,
+  "server_count": 4,
+  "total_tables": 39,
+  "arrival": {
+    "regular_rate_per_minute": 0.29,
+    "peak_rate_per_minute": 0.58,
+    "peak_windows": [
+      {
+        "label": "lunch",
+        "start_minute": 300,
+        "end_minute": 420
+      },
+      {
+        "label": "dinner",
+        "start_minute": 720,
+        "end_minute": 840
+      }
+    ]
+  },
+  "cashier_service_time_range_minutes": [
+    2.0,
+    7.0
+  ],
+  "cashier_service_time_mode_minutes": 3.0,
+  "kitchen": {
+    "regular_prep_time_range_minutes": [
+      7.0,
+      10.0
+    ],
+    "regular_prep_time_mode_minutes": 7.0,
+    "peak_prep_time_range_minutes": [
+      15.0,
+      20.0
+    ],
+    "peak_prep_time_mode_minutes": 17.0,
+    "bottleneck_items": [
+      "Regular Chicken",
+      "Sisig"
+    ],
+    "bottleneck_extra_range_minutes": [
+      3.0,
+      8.0
+    ],
+    "bottleneck_extra_mode_minutes": 5.0
+  },
+  "server_delivery_time_range_minutes": [
+    0.5,
+    1.0
+  ],
+  "dining_time_range_minutes": [
+    20.0,
+    50.0
+  ],
+  "dining_time_mode_minutes": 30.0,
+  "customer_patience_range_minutes": [
+    15.0,
+    60.0
+  ],
+  "customer_patience_mode_minutes": 30.0,
+  "menu": {
+    "items": [
+      "Regular Chicken",
+      "Sisig",
+      "Chicken BBQ",
+      "Pork BBQ",
+      "Lumpia",
+      "Rice",
+      "Drink"
+    ],
+    "weights": [
+      0.3,
+      0.2,
+      0.15,
+      0.1,
+      0.05,
+      0.1,
+      0.1
+    ]
+  },
+  "kiosk": {
+    "kiosk_count": 3,
+    "order_time_range_minutes": [
+      1.0,
+      5.0
+    ],
+    "order_time_mode_minutes": 2.0,
+    "confirm_service_time_range_minutes": [
+      0.5,
+      1.5
+    ],
+    "confirm_service_time_mode_minutes": 1.0,
+    "cash_service_time_range_minutes": [
+      1.0,
+      3.0
+    ],
+    "cash_service_time_mode_minutes": 2.0,
+    "allow_cashier_manual_override": true,
+    "manual_override_probability": 0.15,
+    "manual_order_time_range_minutes": [
+      3.0,
+      8.0
+    ],
+    "manual_order_time_mode_minutes": 5.0,
+    "timeout": {
+      "enable_timeout": true,
+      "confirmation_time_limit_minutes": 5
+    },
+    "payment": {
+      "accept_online_cash_apps": true,
+      "supported_apps": [
+        "GCash",
+        "Maya"
+      ]
+    }
+  }
+}

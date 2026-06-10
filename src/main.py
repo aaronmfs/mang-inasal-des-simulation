@@ -5,7 +5,9 @@ import simpy
 from src.config import Config
 from src.entities.cashier import CashierManager
 from src.entities.kitchen import KitchenManager
-from src.entities.dining import TableManager
+from src.entities.server import ServerManager
+from src.entities.dining import DiningManager
+from src.entities.kiosk import KioskManager
 from src.engine.arrivals import arrival_generator
 from src.engine.monitor import monitor_process
 from src.metrics import Metrics
@@ -17,30 +19,36 @@ def main() -> None:
 
     env = simpy.Environment()
 
-    cashier_mgr = CashierManager(env, config)
-    kitchen_mgr = KitchenManager(env, config)
-    table_mgr = TableManager(env, config)
+    resources = {
+        "cashier": CashierManager(env, config),
+        "kitchen": KitchenManager(env, config),
+        "server": ServerManager(env, config),
+        "dining": DiningManager(env, config),
+    }
 
-    metrics = Metrics()
+    if config.feature_kiosk:
+        resources["kiosk"] = KioskManager(env, config)
 
-    env.process(arrival_generator(
-        env, config, cashier_mgr, kitchen_mgr, table_mgr, metrics
-    ))
-    env.process(monitor_process(
-        env, config, cashier_mgr, table_mgr, metrics
-    ))
+    metrics = Metrics(sim_hours=config.sim_hours, table_capacity=config.num_tables)
+
+    env.process(arrival_generator(env, config, resources, metrics))
+    env.process(monitor_process(env, config, resources, metrics))
 
     env.run(until=config.sim_minutes)
 
     report = metrics.report()
+    summary = report["summary"]
+    details = report["details"]
+
     print("=" * 55)
     print("  MANG INASAL SIMULATION -- DAILY REPORT")
     print("=" * 55)
-    for key, value in report.items():
-        if isinstance(value, float):
-            print(f"  {key:35s}: {value:>10.2f}")
-        else:
-            print(f"  {key:35s}: {value:>10}")
+    print("  --- SUMMARY ---")
+    for key, value in summary.items():
+        print(f"  {key:35s}: {value:>10.2f}")
+    print("  --- DETAILS ---")
+    for key, value in details.items():
+        print(f"  {key:35s}: {value:>10.2f}")
     print("=" * 55)
 
 

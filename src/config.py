@@ -1,100 +1,180 @@
+import json
 import random
-from dataclasses import dataclass, field
-from typing import Tuple
+from typing import Any
 
 
-BOTTLENECK_ITEMS: Tuple[str, ...] = ("Regular Chicken", "Sisig")
-
-
-@dataclass(frozen=True)
 class Config:
-    sim_minutes: int = 960
-    random_seed: int = 42
+    def __init__(self, path: str = "config.json") -> None:
+        with open(path) as f:
+            self._data: dict[str, Any] = json.load(f)
 
-    regular_arrival_rate: float = 0.29
-    peak_arrival_rate: float = 0.58
+    # Feature gates
+    @property
+    def feature_patience(self) -> bool:
+        return self._data["features"]["customer_patience_and_abandonment"]
 
-    lunch_start: int = 300
-    lunch_end: int = 420
-    dinner_start: int = 720
-    dinner_end: int = 840
+    @property
+    def feature_server_resource(self) -> bool:
+        return self._data["features"]["server_resource_bottleneck"]
 
-    num_cashiers: int = 3
-    num_tables: int = 154
-    kitchen_capacity: int = 10
+    @property
+    def feature_kiosk(self) -> bool:
+        return self._data["features"]["kiosk_experimental_mode"]
 
-    cashier_min: float = 2.0
-    cashier_mode: float = 3.0
-    cashier_max: float = 7.0
-
-    kitchen_prep_min: float = 7.0
-    kitchen_prep_mode: float = 7.0
-    kitchen_prep_max: float = 10.0
-
-    kitchen_prep_peak_min: float = 15.0
-    kitchen_prep_peak_mode: float = 17.0
-    kitchen_prep_peak_max: float = 20.0
-
-    bottleneck_extra_min: float = 3.0
-    bottleneck_extra_mode: float = 5.0
-    bottleneck_extra_max: float = 8.0
-
-    release_min: float = 0.5
-    release_max: float = 1.0
-
-    dining_min: float = 20.0
-    dining_mode: float = 30.0
-    dining_max: float = 50.0
-
-    menu_items: Tuple[str, ...] = field(default=(
-        "Regular Chicken", "Sisig", "Chicken BBQ", "Pork BBQ",
-        "Lumpia", "Rice", "Drink"
-    ))
-    menu_weights: Tuple[float, ...] = field(default=(
-        0.30, 0.20, 0.15, 0.10, 0.05, 0.10, 0.10
-    ))
-
-    def is_peak_hour(self, now: float) -> bool:
-        return (self.lunch_start <= now <= self.lunch_end) or \
-               (self.dinner_start <= now <= self.dinner_end)
-
-    def cashier_service_time(self) -> float:
-        return random.triangular(
-            self.cashier_min, self.cashier_max, self.cashier_mode
+    @property
+    def feature_manual_override(self) -> bool:
+        return (
+            self.feature_kiosk
+            and self._data["kiosk"]["allow_cashier_manual_override"]
         )
+
+    # Duration
+    @property
+    def sim_minutes(self) -> int:
+        return self._data["simulation_hours"] * 60
+
+    @property
+    def random_seed(self) -> int:
+        return self._data.get("random_seed", 42)
+
+    @property
+    def sim_hours(self) -> int:
+        return self._data["simulation_hours"]
+
+    # Staff / capacity
+    @property
+    def num_cashiers(self) -> int:
+        return self._data["cashier_count"]
+
+    @property
+    def kitchen_capacity(self) -> int:
+        return self._data["cook_count"]
+
+    @property
+    def num_servers(self) -> int:
+        return self._data["server_count"]
+
+    @property
+    def num_tables(self) -> int:
+        return self._data["total_tables"]
+
+    @property
+    def num_kiosks(self) -> int:
+        return self._data["kiosk"]["kiosk_count"]
+
+    # Arrival
+    def is_peak_hour(self, now: float) -> bool:
+        for w in self._data["arrival"]["peak_windows"]:
+            if w["start_minute"] <= now <= w["end_minute"]:
+                return True
+        return False
+
+    @property
+    def regular_arrival_rate(self) -> float:
+        return self._data["arrival"]["regular_rate_per_minute"]
+
+    @property
+    def peak_arrival_rate(self) -> float:
+        return self._data["arrival"]["peak_rate_per_minute"]
+
+    # Distribution helpers
+    def cashier_service_time(self) -> float:
+        lo, hi = self._data["cashier_service_time_range_minutes"]
+        mode = self._data["cashier_service_time_mode_minutes"]
+        return random.triangular(lo, hi, mode)
 
     def kitchen_prep_time(self, now: float) -> float:
+        k = self._data["kitchen"]
         if self.is_peak_hour(now):
-            return random.triangular(
-                self.kitchen_prep_peak_min,
-                self.kitchen_prep_peak_max,
-                self.kitchen_prep_peak_mode
-            )
-        return random.triangular(
-            self.kitchen_prep_min,
-            self.kitchen_prep_max,
-            self.kitchen_prep_mode
-        )
+            lo, hi = k["peak_prep_time_range_minutes"]
+            mode = k["peak_prep_time_mode_minutes"]
+        else:
+            lo, hi = k["regular_prep_time_range_minutes"]
+            mode = k["regular_prep_time_mode_minutes"]
+        return random.triangular(lo, hi, mode)
 
     def bottleneck_extra_time(self) -> float:
-        return random.triangular(
-            self.bottleneck_extra_min,
-            self.bottleneck_extra_max,
-            self.bottleneck_extra_mode
-        )
+        b = self._data["kitchen"]
+        lo, hi = b["bottleneck_extra_range_minutes"]
+        mode = b["bottleneck_extra_mode_minutes"]
+        return random.triangular(lo, hi, mode)
 
-    def release_time(self) -> float:
-        return random.uniform(self.release_min, self.release_max)
+    def server_delivery_time(self) -> float:
+        lo, hi = self._data["server_delivery_time_range_minutes"]
+        return random.uniform(lo, hi)
 
     def dining_time(self) -> float:
-        return random.triangular(
-            self.dining_min, self.dining_max, self.dining_mode
-        )
+        lo, hi = self._data["dining_time_range_minutes"]
+        mode = self._data["dining_time_mode_minutes"]
+        return random.triangular(lo, hi, mode)
+
+    def patience_time(self) -> float:
+        lo, hi = self._data["customer_patience_range_minutes"]
+        mode = self._data["customer_patience_mode_minutes"]
+        return random.triangular(lo, hi, mode)
+
+    # Kiosk distribution helpers
+    def kiosk_order_time(self) -> float:
+        k = self._data["kiosk"]
+        lo, hi = k["order_time_range_minutes"]
+        mode = k["order_time_mode_minutes"]
+        return random.triangular(lo, hi, mode)
+
+    def kiosk_confirm_service_time(self) -> float:
+        k = self._data["kiosk"]
+        lo, hi = k["confirm_service_time_range_minutes"]
+        mode = k["confirm_service_time_mode_minutes"]
+        return random.triangular(lo, hi, mode)
+
+    def kiosk_cash_service_time(self) -> float:
+        k = self._data["kiosk"]
+        lo, hi = k["cash_service_time_range_minutes"]
+        mode = k["cash_service_time_mode_minutes"]
+        return random.triangular(lo, hi, mode)
+
+    def manual_order_service_time(self) -> float:
+        k = self._data["kiosk"]
+        lo, hi = k["manual_order_time_range_minutes"]
+        mode = k["manual_order_time_mode_minutes"]
+        return random.triangular(lo, hi, mode)
+
+    @property
+    def manual_override_probability(self) -> float:
+        return self._data["kiosk"]["manual_override_probability"]
+
+    @property
+    def kiosk_timeout_enabled(self) -> bool:
+        return self._data["kiosk"]["timeout"]["enable_timeout"]
+
+    @property
+    def confirmation_time_limit(self) -> float:
+        return float(self._data["kiosk"]["timeout"]["confirmation_time_limit_minutes"])
+
+    @property
+    def accept_online_cash_apps(self) -> bool:
+        return self._data["kiosk"]["payment"]["accept_online_cash_apps"]
+
+    @property
+    def supported_apps(self) -> list[str]:
+        return self._data["kiosk"]["payment"]["supported_apps"]
+
+    # Menu
+    @property
+    def bottleneck_items(self) -> tuple[str, ...]:
+        return tuple(self._data["kitchen"]["bottleneck_items"])
+
+    @property
+    def menu_items(self) -> tuple[str, ...]:
+        return tuple(self._data["menu"]["items"])
+
+    @property
+    def menu_weights(self) -> tuple[float, ...]:
+        return tuple(self._data["menu"]["weights"])
 
     def generate_order(self) -> list[str]:
         num_items = random.randint(1, 3)
         return random.choices(
             list(self.menu_items),
             weights=list(self.menu_weights),
-            k=num_items
+            k=num_items,
         )
