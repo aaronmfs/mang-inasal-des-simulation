@@ -5,6 +5,7 @@ from typing import Dict, List, Tuple
 class Metrics:
     def __init__(self, sim_hours: int = 16, table_capacity: int = 39) -> None:
         self.cashier_wait_times: List[float] = []
+        self.cashier_service_times: List[float] = []
         self.kitchen_wait_times: List[float] = []
         self.table_wait_times: List[float] = []
         self.total_system_times: List[float] = []
@@ -13,6 +14,7 @@ class Metrics:
         self.customers_served: int = 0
         self.customers_lost: int = 0
         self.dining_times: List[float] = []
+        self.kiosk_order_times: List[float] = []
         self.kiosk_orders_created: int = 0
         self.kiosk_online_confirmations: int = 0
         self.kiosk_cash_payments: int = 0
@@ -23,6 +25,9 @@ class Metrics:
 
     def record_cashier_wait(self, wait: float) -> None:
         self.cashier_wait_times.append(wait)
+
+    def record_cashier_service_time(self, duration: float) -> None:
+        self.cashier_service_times.append(duration)
 
     def record_kitchen_wait(self, wait: float) -> None:
         self.kitchen_wait_times.append(wait)
@@ -42,6 +47,9 @@ class Metrics:
     def record_kiosk_order(self) -> None:
         self.kiosk_orders_created += 1
 
+    def record_kiosk_order_time(self, duration: float) -> None:
+        self.kiosk_order_times.append(duration)
+
     def record_kiosk_online_confirmation(self) -> None:
         self.kiosk_online_confirmations += 1
 
@@ -60,7 +68,7 @@ class Metrics:
     def snapshot_tables(self, time: float, occupied: int) -> None:
         self.table_occupancy_samples.append((time, occupied))
 
-    def report(self) -> Dict[str, Dict[str, float]]:
+    def report(self, show_kiosk: bool = False) -> Dict[str, Dict[str, float]]:
         summary: Dict[str, float] = {}
         details: Dict[str, float] = {}
 
@@ -71,11 +79,12 @@ class Metrics:
             self.customers_served / max(self.sim_hours, 1)
         )
 
-        details["kiosk_orders_created"] = float(self.kiosk_orders_created)
-        details["kiosk_online_confirmations"] = float(self.kiosk_online_confirmations)
-        details["kiosk_cash_payments"] = float(self.kiosk_cash_payments)
-        details["manual_orders_count"] = float(self.manual_orders_count)
-        details["confirmation_timeouts"] = float(self.confirmation_timeouts)
+        if show_kiosk:
+            details["kiosk_orders_created"] = float(self.kiosk_orders_created)
+            details["kiosk_online_confirmations"] = float(self.kiosk_online_confirmations)
+            details["kiosk_cash_payments"] = float(self.kiosk_cash_payments)
+            details["manual_orders_count"] = float(self.manual_orders_count)
+            details["confirmation_timeouts"] = float(self.confirmation_timeouts)
 
         if self.cashier_wait_times:
             details["avg_cashier_wait_min"] = statistics.mean(self.cashier_wait_times)
@@ -86,6 +95,12 @@ class Metrics:
         if self.table_wait_times:
             details["avg_table_wait_min"] = statistics.mean(self.table_wait_times)
             details["max_table_wait_min"] = max(self.table_wait_times)
+        if self.cashier_service_times:
+            details["avg_cashier_service_time_min"] = statistics.mean(self.cashier_service_times)
+            details["max_cashier_service_time_min"] = max(self.cashier_service_times)
+        if self.kiosk_order_times:
+            details["avg_kiosk_order_time_min"] = statistics.mean(self.kiosk_order_times)
+            details["max_kiosk_order_time_min"] = max(self.kiosk_order_times)
         if self.dining_times:
             details["avg_dining_time_min"] = statistics.mean(self.dining_times)
             details["max_dining_time_min"] = max(self.dining_times)

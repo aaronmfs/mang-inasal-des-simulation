@@ -36,7 +36,7 @@ def main() -> None:
 
     env.run(until=config.sim_minutes)
 
-    report = metrics.report()
+    report = metrics.report(show_kiosk=config.feature_kiosk)
     summary = report["summary"]
     details = report["details"]
 

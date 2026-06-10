@@ -48,6 +48,7 @@ def cashier_step(env, config, customer, resources, metrics):
         customer.cashier_start = env.now
         yield env.timeout(resources["cashier"].service_time())
         customer.cashier_end = env.now
+        metrics.record_cashier_service_time(customer.cashier_end - customer.cashier_start)
     return False
 
 
@@ -59,7 +60,9 @@ def kiosk_step(env, config, customer, resources, metrics):
         if abandoned:
             return True
         customer.items_ordered = config.generate_order()
+        kiosk_start = env.now
         yield env.timeout(resources["kiosk"].order_time())
+        metrics.record_kiosk_order_time(env.now - kiosk_start)
         if config.accept_online_cash_apps and random.random() < 0.5:
             customer.payment_method = "kiosk_online"
             customer.payment_app = random.choice(config.supported_apps)
@@ -120,6 +123,7 @@ def cashier_confirm_step(env, config, customer, resources, metrics):
             metrics.record_kiosk_cash_payment()
 
         customer.cashier_end = env.now
+        metrics.record_cashier_service_time(customer.cashier_end - customer.cashier_start)
     return False
 
 
