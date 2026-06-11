@@ -1,6 +1,7 @@
 import random
 
 import simpy
+from simpy.resources.resource import Request
 
 from src.config import Config
 from src.entities.customer import Customer
@@ -19,7 +20,7 @@ def _race_request(
     config: Config,
     customer: Customer,
     metrics: Metrics,
-    req: simpy.Request,
+    req: Request,
     stage_name: str,
 ) -> bool:
     if not config.feature_patience:
