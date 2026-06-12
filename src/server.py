@@ -299,14 +299,13 @@ async def broadcast_metrics(websocket, message: dict):
 
 
 async def _send_all(payload: str):
-    closed = set()
-    for c in connected_clients:
+    if not connected_clients:
+        return
+    for c in list(connected_clients):
         try:
             await c.send(payload)
         except websockets.exceptions.ConnectionClosed:
-            closed.add(c)
-    for c in closed:
-        connected_clients.discard(c)
+            connected_clients.discard(c)
 
 
 async def _broadcast_state(status: str):
