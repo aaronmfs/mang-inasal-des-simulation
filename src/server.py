@@ -197,7 +197,7 @@ class SimRunner:
             "server": ServerManager(self.env, self.config),
             "dining": DiningManager(self.env, self.config),
         }
-        if self.config.feature_kiosk:
+        if self.config.feature_kiosk and self.config.num_kiosks > 0:
             self.resources["kiosk"] = KioskManager(self.env, self.config)
 
         self.metrics = Metrics(

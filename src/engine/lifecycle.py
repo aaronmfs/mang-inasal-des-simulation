@@ -7,7 +7,7 @@ from src.engine.registry import BUILTIN_STAGES, EXPERIMENTAL_STAGES
 
 
 def _build_pipeline(config: Config) -> list[str]:
-    if config.feature_kiosk:
+    if config.feature_kiosk and config.num_kiosks > 0:
         return ["kiosk", "cashier_confirm", "kitchen", "release", "dining"]
     return ["cashier", "kitchen", "release", "dining"]
 
