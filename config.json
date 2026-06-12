@@ -88,7 +88,7 @@
     ]
   },
   "kiosk": {
-    "kiosk_count": 3,
+    "kiosk_count": 0,
     "order_time_range_minutes": [
       1.0,
       5.0

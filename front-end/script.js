@@ -146,7 +146,7 @@
       kiosk_experimental_mode: true
     },
     kiosk: {
-      kiosk_count: 3,
+      kiosk_count: 0,
       order_time_range_minutes: [1.0, 5.0],
       order_time_mode_minutes: 2.0,
       confirm_service_time_range_minutes: [0.5, 1.5],
@@ -207,7 +207,7 @@
   // ============================================================
   function MangInasalSim(overrides) {
     this.config = JSON.parse(JSON.stringify(SIM_CONFIG));
-    this._kioskOrderProb = 0.87;
+    this._kioskOrderProb = 0;
     this._dineInProb = 0.8;
     this.applyOverrides(overrides || {});
     this.resetState();
@@ -740,11 +740,10 @@
     // Create client-side sim as fallback
     this.sim = new MangInasalSim({
       cashier_count: 3,
-      kiosk_count: 3,
+      kiosk_count: 0,
       regular_rate_per_minute: 0.29,
       cook_count: 10,
       total_tables: 39,
-      kiosk_order_prob: 0.87,
       dine_in_prob: 0.8
     });
 
@@ -967,16 +966,16 @@
     });
 
     this.$.kioskDisableToggle.addEventListener('change', function () {
-      var disabled = self.$.kioskDisableToggle.checked;
-      if (disabled) {
-        self.sim._kioskOrderProb = 0;
-      } else {
+      var enabled = self.$.kioskDisableToggle.checked;
+      if (enabled) {
         self.sim._kioskOrderProb = parseFloat(self.$.kioskRatio.value) || 0.87;
+      } else {
+        self.sim._kioskOrderProb = 0;
       }
       if (self.ws && self.ws.status === 'connected') {
         self.ws.send('update_config', {
-          kiosk_disabled: disabled,
-          active_kiosks: disabled ? 0 : (parseInt(self.$.kioskInput.value, 10) || 3)
+          kiosk_disabled: !enabled,
+          active_kiosks: enabled ? (parseInt(self.$.kioskInput.value, 10) || 3) : 0
         });
       }
     });
@@ -1345,14 +1344,25 @@
     // Skip chart updates when smoothing is off and no new data arrived
     if (!this.tween.enabled && !this._dirtyCharts) return;
 
+    // Only call chart.update() when data actually changed to prevent
+    // tooltip stutter from 60fps canvas redraws (tweening stays intact)
+    var i;
+
     // Donut chart
-    this.charts.donut.data.datasets[0].data = [
+    var d0 = [
       Math.round(t.get('manualOrders')),
       Math.round(t.get('kioskOnline')),
       Math.round(t.get('kioskCash')),
       Math.round(t.get('timeouts'))
     ];
-    this.charts.donut.update('none');
+    var oldDonut = this.charts.donut.data.datasets[0].data;
+    for (i = 0; i < 4; i++) {
+      if (d0[i] !== oldDonut[i]) {
+        this.charts.donut.data.datasets[0].data = d0;
+        this.charts.donut.update('none');
+        break;
+      }
+    }
 
     // Line chart (rolling window)
     var labels = this.rollingLabels.length > 0 ? this.rollingLabels : [minute];
@@ -1369,30 +1379,55 @@
 
     // Histogram (backend data takes priority, fallback to client sim)
     if (this._backendHistValid) {
-      this.charts.hist.data.datasets[0].data = this._backendHistCashier;
-      this.charts.hist.data.datasets[1].data = this._backendHistKitchen;
-      this.charts.hist.data.datasets[2].data = this._backendHistTable;
-      this.charts.hist.update('none');
+      var histChanged = false;
+      for (i = 0; i < 11; i++) {
+        if (this._backendHistCashier[i] !== this.charts.hist.data.datasets[0].data[i] ||
+            this._backendHistKitchen[i] !== this.charts.hist.data.datasets[1].data[i] ||
+            this._backendHistTable[i] !== this.charts.hist.data.datasets[2].data[i]) {
+          histChanged = true;
+          break;
+        }
+      }
+      if (histChanged) {
+        this.charts.hist.data.datasets[0].data = this._backendHistCashier;
+        this.charts.hist.data.datasets[1].data = this._backendHistKitchen;
+        this.charts.hist.data.datasets[2].data = this._backendHistTable;
+        this.charts.hist.update('none');
+      }
     } else if (this.sim) {
       var cashierBins = computeHistogram(this.sim.cashierWaitSamples);
       var kitchenBins = computeHistogram(this.sim.kitchenWaitSamples);
       var tableBins = computeHistogram(this.sim.tableWaitSamples);
-      this.charts.hist.data.datasets[0].data = cashierBins;
-      this.charts.hist.data.datasets[1].data = kitchenBins;
-      this.charts.hist.data.datasets[2].data = tableBins;
-      this.charts.hist.update('none');
+      histChanged = false;
+      for (i = 0; i < 11; i++) {
+        if (cashierBins[i] !== this.charts.hist.data.datasets[0].data[i] ||
+            kitchenBins[i] !== this.charts.hist.data.datasets[1].data[i] ||
+            tableBins[i] !== this.charts.hist.data.datasets[2].data[i]) {
+          histChanged = true;
+          break;
+        }
+      }
+      if (histChanged) {
+        this.charts.hist.data.datasets[0].data = cashierBins;
+        this.charts.hist.data.datasets[1].data = kitchenBins;
+        this.charts.hist.data.datasets[2].data = tableBins;
+        this.charts.hist.update('none');
+      }
     }
 
     // Bar chart (Avg vs Max)
-    this.charts.bar.data.datasets[0].data = [
-      t.get('avgCashierService'), t.get('avgKioskOrder'),
-      t.get('avgDining'), t.get('avgSystem')
-    ];
-    this.charts.bar.data.datasets[1].data = [
-      t.get('maxCashierService'), t.get('maxKioskOrder'),
-      t.get('maxDining'), Math.max(t.get('maxCashierService'), t.get('maxKitchenWait'))
-    ];
-    this.charts.bar.update('none');
+    var b0 = [t.get('avgCashierService'), t.get('avgKioskOrder'), t.get('avgDining'), t.get('avgSystem')];
+    var b1 = [t.get('maxCashierService'), t.get('maxKioskOrder'), t.get('maxDining'), Math.max(t.get('maxCashierService'), t.get('maxKitchenWait'))];
+    var oldB0 = this.charts.bar.data.datasets[0].data;
+    var oldB1 = this.charts.bar.data.datasets[1].data;
+    for (i = 0; i < 4; i++) {
+      if (b0[i] !== oldB0[i] || b1[i] !== oldB1[i]) {
+        this.charts.bar.data.datasets[0].data = b0;
+        this.charts.bar.data.datasets[1].data = b1;
+        this.charts.bar.update('none');
+        break;
+      }
+    }
 
     this._dirtyCharts = false;
   };
@@ -1418,7 +1453,7 @@
     var arrivalRate = parseFloat(this.$.arrivalInput.value) || 0.29;
 
     if (this.useBackend && this.ws && this.ws.status === 'connected') {
-      kiosks = this.$.kioskDisableToggle.checked ? 0 : kiosks;
+      kiosks = this.$.kioskDisableToggle.checked ? kiosks : 0;
       this.ws.send('update_config', {
         active_cashiers: cashiers,
         active_kiosks: kiosks,
@@ -1429,7 +1464,7 @@
 
     // Client-side
     this.sim.config.cashier_count = cashiers;
-    this.sim.config.kiosk.kiosk_count = this.$.kioskDisableToggle.checked ? 0 : kiosks;
+    this.sim.config.kiosk.kiosk_count = this.$.kioskDisableToggle.checked ? kiosks : 0;
     this.sim.config.arrival.regular_rate_per_minute = arrivalRate;
     while (this.sim.cashierBusy.length < cashiers) this.sim.cashierBusy.push(0);
     if (this.sim.cashierBusy.length > cashiers) this.sim.cashierBusy.length = cashiers;
@@ -1444,13 +1479,13 @@
         total_table_capacity: parseInt(this.$.totalTables.value, 10) || 39,
         order_type_distribution: { kiosk: parseFloat(this.$.kioskRatio.value) || 0.87 },
         dining_choice_distribution: { dine_in: parseFloat(this.$.dineInRatio.value) || 0.8 },
-        kiosk_disabled: this.$.kioskDisableToggle.checked
+        kiosk_disabled: !this.$.kioskDisableToggle.checked
       });
       return;
     }
 
     this.sim.config.cook_count = parseInt(this.$.kitchenStaff.value, 10) || 10;
-    this.sim._kioskOrderProb = this.$.kioskDisableToggle.checked ? 0 : (parseFloat(this.$.kioskRatio.value) || 0.87);
+    this.sim._kioskOrderProb = this.$.kioskDisableToggle.checked ? (parseFloat(this.$.kioskRatio.value) || 0.87) : 0;
     this.sim._dineInProb = parseFloat(this.$.dineInRatio.value) || 0.8;
     this.sim.config.total_tables = parseInt(this.$.totalTables.value, 10) || 39;
     while (this.sim.kitchenBusy.length < this.sim.config.cook_count) this.sim.kitchenBusy.push(0);
