@@ -4,7 +4,7 @@
   // ============================================================
   // Constants
   // ============================================================
-  const WS_URL = 'ws://localhost:8765';
+  const WS_URL = 'ws://' + location.hostname + ':8765';
   const ROLLING_WINDOW_MINUTES = 5;
   const MAX_SAMPLES = 500;
 
