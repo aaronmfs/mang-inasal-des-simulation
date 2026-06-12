@@ -4,6 +4,8 @@ Discrete-event simulation of a Mang Inasal restaurant branch, built with Python 
 
 Models the complete customer journey from arrival to departure across cashier, kitchen, and dining stages under both regular and peak-hour conditions. Supports an experimental kiosk-first workflow with online payment confirmation and cashier manual override for non-kiosk customers. All simulation parameters are externalized to `config.json` — no hardcoded values in source code.
 
+![Demo Image of Web Dashboard](Demo.png)
+
 ## How It Works
 
 Every customer entity flows through a configurable pipeline of FIFO stages. Two pipelines are available:
@@ -19,8 +21,6 @@ Arrival → Kiosk → Cashier Confirm → Kitchen Prep → Release Claim → Sea
 ```
 
 In kiosk mode, customers place orders at self-service kiosks and either pay online (quick cashier confirmation) or at the counter. A configurable `manual_override_probability` bypasses the kiosk for non-tech-savvy customers, routing them directly to a cashier for full order entry + payment. Kiosk state and capacity can be toggled at runtime via the web interface — no restart required.
-
-![Demo Image of Web Dashboard](Demo.png)
 
 Each stage is parameterized with bounded probability distributions triangulated from interview data and direct observation:
 
