@@ -1231,8 +1231,10 @@
   // ============================================================
   Dashboard.prototype._runClientTick = function () {
     var self = this;
+    self._tickGen = (self._tickGen || 0) + 1;
+    var gen = self._tickGen;
     var tick = function () {
-      if (!self.simRunning) return;
+      if (!self.simRunning || gen !== self._tickGen) return;
       if (self.frozen) {
         self.simInterval = setTimeout(tick, 50);
         return;
@@ -1250,9 +1252,11 @@
   Dashboard.prototype._runMaxThroughput = function () {
     var self = this;
     if (!self.simRunning) return;
+    self._tickGen = (self._tickGen || 0) + 1;
+    var gen = self._tickGen;
     self._stopClientTick();
     var tick = function () {
-      if (!self.simRunning) return;
+      if (!self.simRunning || gen !== self._tickGen) return;
       if (self.tween.enabled) {
         self._runClientTick();
         return;
@@ -1386,9 +1390,9 @@
     var maxOccData = this.rollingOccupancy.map(function () { return t.get('maxOccupancy'); });
     while (maxOccData.length < labels.length) maxOccData.push(t.get('maxOccupancy'));
 
-    this.charts.line.data.labels = labels;
-    this.charts.line.data.datasets[0].data = utilData;
-    this.charts.line.data.datasets[1].data = occData;
+    this.charts.line.data.labels = labels.slice();
+    this.charts.line.data.datasets[0].data = utilData.slice();
+    this.charts.line.data.datasets[1].data = occData.slice();
     this.charts.line.data.datasets[2].data = maxOccData;
     this.charts.line.update('none');
 
