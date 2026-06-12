@@ -26,7 +26,7 @@ def main() -> None:
         "dining": DiningManager(env, config),
     }
 
-    if config.feature_kiosk:
+    if config.feature_kiosk and config.num_kiosks > 0:
         resources["kiosk"] = KioskManager(env, config)
 
     metrics = Metrics(sim_hours=config.sim_hours, table_capacity=config.num_tables)

@@ -60,8 +60,7 @@ class Config:
 
     @property
     def num_kiosks(self) -> int:
-        value = self._data["kiosk"]["kiosk_count"]
-        return 3 if value <= 0 else value
+        return self._data["kiosk"]["kiosk_count"]
 
     # Arrival
     def is_peak_hour(self, now: float) -> bool:
