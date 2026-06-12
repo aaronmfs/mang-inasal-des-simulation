@@ -24,9 +24,10 @@
 
   function lerp(a, b, t) { return a + (b - a) * t; }
 
-  function formatTime(minute, use24hr) {
-    var startHour = 10;
-    var totalMinutes = startHour * 60 + minute;
+  function formatTime(minute, use24hr, startHour, startMinute) {
+    startHour = startHour || 10;
+    startMinute = startMinute || 0;
+    var totalMinutes = startHour * 60 + startMinute + minute;
     var h = Math.floor(totalMinutes / 60) % 24;
     var m = Math.floor(totalMinutes % 60);
     var mm = m < 10 ? '0' + m : '' + m;
@@ -726,6 +727,8 @@
     this._backendHistValid = false;
     this._dirtyCharts = false;
     this._use24hr = false;
+    this._startHour = 10;
+    this._startMinute = 0;
 
     // DOM refs
     this.$ = {};
@@ -775,6 +778,7 @@
     $.smoothingToggle = document.getElementById('smoothingToggle');
     $.kioskDisableToggle = document.getElementById('kioskDisableToggle');
     $.formatToggle = document.getElementById('formatToggle');
+    $.startTime = document.getElementById('startTime');
     $.modalSpeedSlider = document.getElementById('modalSpeedSlider');
     $.modalSpeedValue = document.getElementById('modalSpeedValue');
     $.connStatus = document.getElementById('connStatus');
@@ -928,6 +932,7 @@
     });
 
     this.$.settingsIcon.addEventListener('click', function () {
+      self.$.startTime.value = (self._startHour < 10 ? '0' : '') + self._startHour + ':' + (self._startMinute < 10 ? '0' : '') + self._startMinute;
       self.$.modalOverlay.style.display = 'flex';
     });
 
@@ -982,6 +987,10 @@
 
     this.$.formatToggle.addEventListener('change', function () {
       self._use24hr = self.$.formatToggle.checked;
+    });
+
+    this.$.startTime.addEventListener('change', function () {
+      self._applyStartTime();
     });
 
     // Live validation on input
@@ -1331,7 +1340,7 @@
     // KPI cards
     this.$.kpServed.textContent = Math.round(t.get('served'));
     this.$.kpLost.textContent = Math.round(t.get('lost'));
-    this.$.kpTime.textContent = formatTime(minute, this._use24hr);
+    this.$.kpTime.textContent = formatTime(minute, this._use24hr, this._startHour, this._startMinute);
     this.$.kpHours.textContent = t.get('hours').toFixed(2);
     this.$.kpThroughput.textContent = t.get('throughput').toFixed(2);
     this.$.kpAvgQueue.textContent = t.get('avgQueue').toFixed(2);
@@ -1493,6 +1502,17 @@
     if (this.tween.enabled !== undefined) {
       this.tween.enabled = this.$.smoothingToggle.checked;
     }
+  };
+
+  Dashboard.prototype._applyStartTime = function () {
+    var val = this.$.startTime.value;
+    if (!val) return;
+    var parts = val.split(':');
+    var h = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return;
+    this._startHour = h;
+    this._startMinute = m;
   };
 
   // ============================================================

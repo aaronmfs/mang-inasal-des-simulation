@@ -97,7 +97,7 @@ python -m src.server
 
 Then open **http://0.0.0.0:8000** in your browser.
 
-The web interface provides a real-time dashboard with queue/occupancy charts, configurable simulation speed, and a settings panel to toggle resources (kiosk, cashiers, etc.) at runtime without restarting.
+The web interface provides a real-time dashboard with queue/occupancy charts, configurable simulation speed, and a settings panel to toggle resources (kiosk, cashiers, etc.) and configure the system start time at runtime without restarting.
 
 ## Screenshot
 
