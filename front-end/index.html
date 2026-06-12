@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Mang Inasal Simulation Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <div class="control-bar">
+    <span class="brand">Mang Inasal Sim</span>
+    <span class="connection-status disconnected" id="connStatus">DISCONNECTED</span>
+    <button id="startBtn" class="btn">▶ Start</button>
+    <button id="resetBtn" class="btn">↺ Reset</button>
+    <div class="speed-group">
+      <label>Speed</label>
+      <input type="range" id="speedSlider" min="0.5" max="10" step="0.5" value="1">
+      <span id="speedValue" style="font-family: monospace; font-size:0.8rem;">1x</span>
+    </div>
+    <div class="quick-param">
+      <label>Cashiers</label>
+      <input type="number" id="cashierInput" value="3" min="1" max="10" step="1">
+      <span class="error-msg" id="cashierErr" style="display:none;color:#ef4444;font-size:0.6rem;"></span>
+    </div>
+    <div class="quick-param">
+      <label>Kiosks</label>
+      <input type="number" id="kioskInput" value="3" min="1" max="10" step="1">
+    </div>
+    <div class="quick-param">
+      <label>Arrival/min</label>
+      <input type="number" id="arrivalInput" value="0.29" min="0.1" max="5.0" step="0.01">
+      <span class="error-msg" id="arrivalErr" style="display:none;color:#ef4444;font-size:0.6rem;"></span>
+    </div>
+    <span class="settings-icon" id="settingsIcon" title="Advanced Config">&#9881;&#65039;</span>
+  </div>
+
+  <div class="dashboard">
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <span class="kpi-label">Customers Served</span>
+        <span class="kpi-value" id="kpServed">0</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Customers Lost</span>
+        <span class="kpi-value" id="kpLost">0</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Current Time</span>
+        <span class="kpi-value" id="kpTime">10:00 AM</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Hours Simulated</span>
+        <span class="kpi-value" id="kpHours">0.00</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Hourly Throughput</span>
+        <span class="kpi-value" id="kpThroughput">0.00</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Avg Queue Len</span>
+        <span class="kpi-value" id="kpAvgQueue">0.00</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">Max Queue Len</span>
+        <span class="kpi-value" id="kpMaxQueue">0</span>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-panel">
+        <div class="panel-title">Table Occupancy &amp; Utilization</div>
+        <div class="chart-container"><canvas id="lineChart"></canvas></div>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-title">Order &amp; Payment Funnel</div>
+        <div class="chart-container"><canvas id="donutChart"></canvas></div>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-title">Wait Time Distribution (min)</div>
+        <div class="chart-container"><canvas id="histogramChart"></canvas></div>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-title">Service Times: Avg vs Max</div>
+        <div class="chart-container"><canvas id="barChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>Advanced Configuration</h3>
+
+    <div class="form-group">
+      <label>Kitchen Staff (cooks)</label>
+      <input type="number" id="kitchenStaff" value="10" min="1" max="15">
+    </div>
+    <div class="form-group">
+      <label>Kiosk Order Ratio (0-1)</label>
+      <input type="number" id="kioskRatio" value="0.87" min="0" max="1" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>Dine-in Ratio (0-1)</label>
+      <input type="number" id="dineInRatio" value="0.8" min="0" max="1" step="0.01">
+    </div>
+    <div class="form-group">
+      <label>Total Tables</label>
+      <input type="number" id="totalTables" value="39" min="5" max="100">
+    </div>
+
+    <hr class="section-divider">
+
+    <div class="form-group">
+      <label>Animation Smoothing</label>
+      <label class="toggle-switch">
+        <input type="checkbox" id="smoothingToggle" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="form-group">
+      <label>Speed Multiplier</label>
+      <div class="inline-label">
+        <input type="range" id="modalSpeedSlider" min="0.5" max="10" step="0.5" value="1" style="width:120px;">
+        <span id="modalSpeedValue" style="font-family:monospace;font-size:0.8rem;width:30px;">1x</span>
+      </div>
+    </div>
+
+    <button class="close-btn" id="closeModal">Close</button>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

@@ -3,7 +3,7 @@
   "features": {
     "customer_patience_and_abandonment": true,
     "server_resource_bottleneck": true,
-    "kiosk_experimental_mode": false
+    "kiosk_experimental_mode": true
   },
   "simulation_hours": 16,
   "random_seed": 42,

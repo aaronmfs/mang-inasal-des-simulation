@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Mang Inasal Simulation Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      height: 100vh; width: 100vw; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    #app {
+      display: flex; flex-direction: column; height: 100vh; width: 100vw;
+      padding: 0.5rem; gap: 0.5rem;
+    }
+    .control-bar {
+      display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0.75rem;
+      background: #1e293b; border-radius: 0.75rem;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); flex-wrap: wrap;
+    }
+    .control-bar .brand {
+      font-weight: 600; font-size: 1.1rem; letter-spacing: -0.5px; white-space: nowrap;
+      background: linear-gradient(135deg, #94a3b8, #cbd5e1);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; margin-right: auto;
+    }
+    .btn {
+      background: #334155; border: none; color: #e2e8f0; padding: 0.45rem 0.85rem;
+      border-radius: 0.5rem; font-size: 0.85rem; font-weight: 500; cursor: pointer;
+      transition: all 0.15s ease; display: flex; align-items: center; gap: 0.3rem;
+    }
+    .btn:hover { background: #475569; }
+    .btn:active { background: #64748b; }
+    .btn.active { background: #2563eb; color: white; }
+    .speed-group {
+      display: flex; align-items: center; gap: 0.5rem;
+      background: #1e293b; padding: 0.2rem 0.5rem; border-radius: 0.5rem;
+    }
+    .speed-group label { font-size: 0.75rem; color: #94a3b8; }
+    input[type="range"] { width: 100px; accent-color: #3b82f6; }
+    .quick-param { display: flex; align-items: center; gap: 0.3rem; }
+    .quick-param label { font-size: 0.7rem; color: #94a3b8; white-space: nowrap; }
+    .quick-param input {
+      width: 55px; background: #0f172a; border: 1px solid #334155;
+      color: #e2e8f0; padding: 0.3rem; border-radius: 0.3rem;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; text-align: center;
+    }
+    .settings-icon { cursor: pointer; font-size: 1.2rem; opacity: 0.8; }
+    .settings-icon:hover { opacity: 1; }
+    .dashboard { flex: 1; display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
+    .kpi-row { display: flex; gap: 0.5rem; flex-wrap: nowrap; }
+    .kpi-card {
+      flex: 1; background: #1e293b; border-radius: 0.75rem; padding: 0.6rem 0.8rem;
+      display: flex; flex-direction: column; justify-content: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .kpi-label {
+      font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px;
+      color: #64748b; margin-bottom: 0.2rem;
+    }
+    .kpi-value {
+      font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 700;
+      color: #f1f5f9; line-height: 1;
+    }
+    .charts-grid {
+      flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+      gap: 0.5rem; min-height: 0;
+    }
+    .chart-panel {
+      background: #1e293b; border-radius: 0.75rem; padding: 0.6rem;
+      display: flex; flex-direction: column; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .chart-panel .panel-title {
+      font-size: 0.7rem; font-weight: 500; color: #94a3b8; margin-bottom: 0.3rem;
+    }
+    .chart-container { flex: 1; position: relative; width: 100%; }
+    .modal-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 100;
+      justify-content: center; align-items: center;
+    }
+    .modal {
+      background: #1e293b; border-radius: 1rem; padding: 1.5rem; width: 400px;
+      max-width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5); color: #e2e8f0;
+    }
+    .modal h3 { margin-bottom: 1rem; font-weight: 600; }
+    .modal .form-group {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;
+    }
+    .modal label { font-size: 0.8rem; }
+    .modal input {
+      width: 80px; background: #0f172a; border: 1px solid #334155;
+      color: #e2e8f0; padding: 0.3rem; border-radius: 0.3rem;
+      font-family: 'JetBrains Mono', monospace; text-align: center;
+    }
+    .modal .close-btn {
+      margin-top: 1rem; background: #334155; border: none;
+      color: #e2e8f0; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="control-bar">
+    <span class="brand">🍗 Mang Inasal Sim</span>
+    <button id="startBtn" class="btn">▶ Start</button>
+    <button id="resetBtn" class="btn">↺ Reset</button>
+    <div class="speed-group">
+      <label>Speed</label>
+      <input type="range" id="speedSlider" min="0.5" max="10" step="0.5" value="1">
+      <span id="speedValue" style="font-family: monospace; font-size:0.8rem;">1x</span>
+    </div>
+    <div class="quick-param">
+      <label>Cashiers</label>
+      <input type="number" id="cashierInput" value="3" min="1" max="10" step="1">
+    </div>
+    <div class="quick-param">
+      <label>Kiosks</label>
+      <input type="number" id="kioskInput" value="3" min="1" max="10" step="1">
+    </div>
+    <div class="quick-param">
+      <label>Arrival/hr</label>
+      <input type="number" id="arrivalInput" value="17" min="5" max="60" step="1">
+    </div>
+    <span class="settings-icon" id="settingsIcon" title="Advanced Config">⚙️</span>
+  </div>
+
+  <div class="dashboard">
+    <div class="kpi-row">
+      <div class="kpi-card"><span class="kpi-label">Customers Served</span><span class="kpi-value" id="kpServed">0</span></div>
+      <div class="kpi-card"><span class="kpi-label">Customers Lost</span><span class="kpi-value" id="kpLost">0</span></div>
+      <div class="kpi-card"><span class="kpi-label">Current Time</span><span class="kpi-value" id="kpTime">10:00 AM</span></div>
+      <div class="kpi-card"><span class="kpi-label">Hours Simulated</span><span class="kpi-value" id="kpHours">0.00</span></div>
+      <div class="kpi-card"><span class="kpi-label">Hourly Throughput</span><span class="kpi-value" id="kpThroughput">0.00</span></div>
+      <div class="kpi-card"><span class="kpi-label">Avg Queue Len</span><span class="kpi-value" id="kpAvgQueue">0.00</span></div>
+      <div class="kpi-card"><span class="kpi-label">Max Queue Len</span><span class="kpi-value" id="kpMaxQueue">0</span></div>
+    </div>
+
+    <div class="charts-grid">
+      <div class="chart-panel">
+        <div class="panel-title">📈 Table Occupancy & Utilization</div>
+        <div class="chart-container"><canvas id="lineChart"></canvas></div>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-title">🍩 Order & Payment Funnel</div>
+        <div class="chart-container"><canvas id="donutChart"></canvas></div>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-title">📊 Wait Time Distribution (min)</div>
+        <div class="chart-container"><canvas id="histogramChart"></canvas></div>
+      </div>
+      <div class="chart-panel">
+        <div class="panel-title">⏱️ Service Times: Avg vs Max</div>
+        <div class="chart-container"><canvas id="barChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>⚙️ Advanced Configuration</h3>
+    <div class="form-group"><label>Kitchen Staff (cooks)</label><input type="number" id="kitchenStaff" value="10" min="1" max="15"></div>
+    <div class="form-group"><label>Kiosk Order Ratio (0-1)</label><input type="number" id="kioskRatio" value="0.87" min="0" max="1" step="0.01"></div>
+    <div class="form-group"><label>Dine-in Ratio (0-1)</label><input type="number" id="dineInRatio" value="0.8" min="0" max="1" step="0.01"></div>
+    <div class="form-group"><label>Total Tables</label><input type="number" id="totalTables" value="39" min="5" max="100"></div>
+    <button class="close-btn" id="closeModal">Close</button>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // ---------- Configuration (JSON Schema) ----------
+    const SIM_CONFIG = {
+      "_schema_version": "1.0",
+      "features": {
+        "customer_patience_and_abandonment": true,
+        "server_resource_bottleneck": true,
+        "kiosk_experimental_mode": true
+      },
+      "kiosk": {
+        "kiosk_count": 3,
+        "order_time_range_minutes": [1.0, 5.0],
+        "order_time_mode_minutes": 2.0,
+        "confirm_service_time_range_minutes": [0.5, 1.5],
+        "confirm_service_time_mode_minutes": 1.0,
+        "cash_service_time_range_minutes": [1.0, 3.0],
+        "cash_service_time_mode_minutes": 2.0,
+        "allow_cashier_manual_override": true,
+        "manual_override_probability": 0.15,
+        "manual_order_time_range_minutes": [3.0, 8.0],
+        "manual_order_time_mode_minutes": 5.0,
+        "timeout": {
+          "enable_timeout": true,
+          "confirmation_time_limit_minutes": 5
+        },
+        "payment": {
+          "accept_online_cash_apps": true,
+          "supported_apps": ["GCash", "Maya"]
+        }
+      },
+      "simulation_hours": 16,
+      "random_seed": 42,
+      "cashier_count": 3,
+      "cook_count": 10,
+      "server_count": 4,
+      "total_tables": 39,
+      "arrival": {
+        "regular_rate_per_minute": 0.29,
+        "peak_rate_per_minute": 0.58,
+        "peak_windows": [
+          { "label": "lunch", "start_minute": 300, "end_minute": 420 },
+          { "label": "dinner", "start_minute": 720, "end_minute": 840 }
+        ]
+      },
+      "cashier_service_time_range_minutes": [2.0, 7.0],
+      "cashier_service_time_mode_minutes": 3.0,
+      "kitchen": {
+        "regular_prep_time_range_minutes": [7.0, 10.0],
+        "regular_prep_time_mode_minutes": 7.0,
+        "peak_prep_time_range_minutes": [15.0, 20.0],
+        "peak_prep_time_mode_minutes": 17.0,
+        "bottleneck_items": ["Regular Chicken", "Sisig"],
+        "bottleneck_extra_range_minutes": [3.0, 8.0],
+        "bottleneck_extra_mode_minutes": 5.0
+      },
+      "server_delivery_time_range_minutes": [0.5, 1.0],
+      "dining_time_range_minutes": [20.0, 50.0],
+      "dining_time_mode_minutes": 30.0,
+      "customer_patience_range_minutes": [15.0, 60.0],
+      "customer_patience_mode_minutes": 30.0,
+      "menu": {
+        "items": ["Regular Chicken", "Sisig", "Chicken BBQ", "Pork BBQ", "Lumpia", "Rice", "Drink"],
+        "weights": [0.3, 0.2, 0.15, 0.1, 0.05, 0.1, 0.1]
+      }
+    };
+
+    // ---------- Simulation Engine ----------
+    class MangInasalSim {
+      constructor(overrides = {}) {
+        this.config = JSON.parse(JSON.stringify(SIM_CONFIG));
+        this.applyOverrides(overrides);
+        this.resetState();
+      }
+
+      applyOverrides(overrides) {
+        if (overrides.cashier_count) this.config.cashier_count = overrides.cashier_count;
+        if (overrides.kiosk_count) this.config.kiosk.kiosk_count = overrides.kiosk_count;
+        if (overrides.regular_rate_per_minute) this.config.arrival.regular_rate_per_minute = overrides.regular_rate_per_minute;
+        if (overrides.cook_count) this.config.cook_count = overrides.cook_count;
+        if (overrides.total_tables) this.config.total_tables = overrides.total_tables;
+        if (overrides.kiosk_order_prob !== undefined) this._kioskOrderProb = overrides.kiosk_order_prob;
+        if (overrides.dine_in_prob !== undefined) this._dineInProb = overrides.dine_in_prob;
+      }
+
+      resetState() {
+        const c = this.config;
+        this.currentMinute = 0;
+        this.customersServed = 0;
+        this.customersLost = 0;
+        this.totalHoursSimulated = 0;
+
+        // Resources
+        this.cashierBusy = new Array(c.cashier_count).fill(0);
+        this.kioskBusy = new Array(c.kiosk.kiosk_count).fill(0);
+        this.kitchenBusy = new Array(c.cook_count).fill(0);
+        this.serverBusy = new Array(c.server_count).fill(0);
+        this.tableOccupied = 0;
+        this.tableTimers = [];
+
+        // Queues
+        this.cashierQueue = [];
+        this.kitchenQueue = [];
+        this.serverQueue = [];   // orders waiting for server delivery
+        this.tableQueue = [];
+
+        // Stats samples
+        this.cashierWaitSamples = [];
+        this.kitchenWaitSamples = [];
+        this.tableWaitSamples = [];
+        this.cashierServiceTimes = [];
+        this.kioskOrderTimes = [];
+        this.diningTimes = [];
+        this.systemTimes = [];
+
+        // Time series (last 60 points)
+        this.timeSeriesUtil = [];
+        this.timeSeriesOccupancy = [];
+        this.timeSeriesMaxOccupancy = [];
+        this.timeLabels = [];
+
+        // Order funnel
+        this.manualOrders = 0;
+        this.kioskCreated = 0;
+        this.kioskOnline = 0;
+        this.kioskCash = 0;
+        this.timeouts = 0;
+
+        // Queue length / occupancy stats
+        this.queueLenSum = 0;
+        this.queueLenCount = 0;
+        this.maxQueueLen = 0;
+        this.occupancySum = 0;
+        this.occupancyCount = 0;
+        this.maxOccupancyEver = 0;
+
+        this.nextId = 1;
+        this._activeKitchenOrders = [];
+        this._activeServerOrders = [];
+      }
+
+      sampleFromRangeMode(range, mode) {
+        // simple triangular-like distribution: sample uniformly and shift towards mode
+        const a = range[0], b = range[1];
+        const raw = a + Math.random() * (b - a);
+        const mix = (mode - a) / (b - a);
+        const r = Math.random();
+        if (r < mix) return a + Math.sqrt(r * mix) * (mode - a);
+        else return mode + Math.sqrt((1 - r) * (1 - mix)) * (b - mode);
+      }
+
+      isPeak(minute) {
+        return this.config.arrival.peak_windows.some(w => minute >= w.start_minute && minute < w.end_minute);
+      }
+
+      tick() {
+        const c = this.config;
+        this.currentMinute++;
+        const minute = this.currentMinute;
+
+        // 1. Arrivals
+        const rate = this.isPeak(minute) ? c.arrival.peak_rate_per_minute : c.arrival.regular_rate_per_minute;
+        const arrivals = this.poisson(rate);
+        for (let i = 0; i < arrivals; i++) {
+          const isKiosk = Math.random() < (this._kioskOrderProb ?? 0.87);
+          const dineIn = Math.random() < (this._dineInProb ?? 0.8);
+          const patience = this.sampleFromRangeMode(c.customer_patience_range_minutes, c.customer_patience_mode_minutes);
+          const cust = {
+            id: this.nextId++,
+            arrivalMinute: minute,
+            isKiosk,
+            dineIn,
+            patience,
+            lost: false
+          };
+          if (isKiosk) {
+            this.processKioskArrival(cust);
+          } else {
+            this.processManualArrival(cust);
+          }
+        }
+
+        // 2. Progress cashier services
+        this.updateCashiers(minute);
+        // 3. Progress kiosk orders
+        this.updateKiosks(minute);
+        // 4. Progress kitchen
+        this.updateKitchen(minute);
+        // 5. Progress servers
+        this.updateServers(minute);
+        // 6. Progress tables
+        this.updateTables(minute);
+
+        // Update summary stats
+        this.totalHoursSimulated = minute / 60;
+        const currentQueueLen = this.cashierQueue.length + this.cashierBusy.filter(t => t > 0).length;
+        this.queueLenSum += currentQueueLen;
+        this.queueLenCount++;
+        if (currentQueueLen > this.maxQueueLen) this.maxQueueLen = currentQueueLen;
+        this.occupancySum += this.tableOccupied;
+        this.occupancyCount++;
+        if (this.tableOccupied > this.maxOccupancyEver) this.maxOccupancyEver = this.tableOccupied;
+
+        const utilPct = (this.tableOccupied / c.total_tables) * 100;
+        this.timeSeriesUtil.push(utilPct);
+        this.timeSeriesOccupancy.push(this.tableOccupied);
+        this.timeSeriesMaxOccupancy.push(this.maxOccupancyEver);
+        this.timeLabels.push(minute);
+        const maxPoints = 60;
+        while (this.timeSeriesUtil.length > maxPoints) {
+          this.timeSeriesUtil.shift();
+          this.timeSeriesOccupancy.shift();
+          this.timeSeriesMaxOccupancy.shift();
+          this.timeLabels.shift();
+        }
+
+        // Trim sample buffers
+        const MAX_SAMPLES = 500;
+        ['cashierWaitSamples','kitchenWaitSamples','tableWaitSamples','cashierServiceTimes','kioskOrderTimes','diningTimes','systemTimes']
+          .forEach(key => { if (this[key].length > MAX_SAMPLES) this[key] = this[key].slice(-MAX_SAMPLES); });
+      }
+
+      poisson(mean) {
+        if (mean <= 0) return 0;
+        const L = Math.exp(-mean);
+        let k = 0, p = 1;
+        do { k++; p *= Math.random(); } while (p > L);
+        return k - 1;
+      }
+
+      processKioskArrival(cust) {
+        this.kioskCreated++;
+        const freeIdx = this.kioskBusy.findIndex(t => t <= 0);
+        if (freeIdx === -1) { this.customersLost++; return; }
+        const orderTime = this.sampleFromRangeMode(this.config.kiosk.order_time_range_minutes, this.config.kiosk.order_time_mode_minutes);
+        this.kioskBusy[freeIdx] = orderTime;
+        this.kioskOrderTimes.push(orderTime);
+        // payment step (confirmation/cash) will be handled after order completion
+        cust._kioskIdx = freeIdx;
+        cust._orderEndMinute = this.currentMinute + orderTime;
+        this._activeKioskOrders = this._activeKioskOrders || [];
+        this._activeKioskOrders.push(cust);
+      }
+
+      processManualArrival(cust) {
+        this.manualOrders++;
+        const freeCashier = this.cashierBusy.findIndex(t => t <= 0);
+        if (freeCashier !== -1) {
+          const serviceTime = this.sampleFromRangeMode(this.config.cashier_service_time_range_minutes, this.config.cashier_service_time_mode_minutes);
+          this.cashierBusy[freeCashier] = serviceTime;
+          this.cashierWaitSamples.push(0);
+          this.cashierServiceTimes.push(serviceTime);
+          this.kitchenQueue.push({ ...cust, orderTime: this.currentMinute + serviceTime });
+        } else {
+          this.cashierQueue.push({ ...cust, queueEntryTime: this.currentMinute });
+        }
+      }
+
+      updateCashiers(minute) {
+        for (let i = 0; i < this.cashierBusy.length; i++) {
+          if (this.cashierBusy[i] > 0) {
+            this.cashierBusy[i] = Math.max(0, this.cashierBusy[i] - 1);
+            if (this.cashierBusy[i] <= 0 && this.cashierQueue.length > 0) {
+              const next = this.cashierQueue.shift();
+              const wait = minute - next.queueEntryTime;
+              if (wait > next.patience) { this.customersLost++; continue; }
+              this.cashierWaitSamples.push(wait);
+              const serviceTime = this.sampleFromRangeMode(this.config.cashier_service_time_range_minutes, this.config.cashier_service_time_mode_minutes);
+              this.cashierBusy[i] = serviceTime;
+              this.cashierServiceTimes.push(serviceTime);
+              this.kitchenQueue.push({ ...next, orderTime: minute + serviceTime });
+            }
+          }
+        }
+        // abandon impatient in queue
+        for (let i = this.cashierQueue.length-1; i >=0; i--) {
+          if (minute - this.cashierQueue[i].queueEntryTime > this.cashierQueue[i].patience) {
+            this.cashierQueue.splice(i,1);
+            this.customersLost++;
+          }
+        }
+      }
+
+      updateKiosks(minute) {
+        if (!this._activeKioskOrders) return;
+        for (let i = this._activeKioskOrders.length-1; i >=0; i--) {
+          const cust = this._activeKioskOrders[i];
+          const idx = cust._kioskIdx;
+          if (this.kioskBusy[idx] <= 0) {
+            // order complete, now payment
+            this._activeKioskOrders.splice(i,1);
+            const payOnline = Math.random() < 0.5;
+            if (payOnline) {
+              const confirmTime = this.sampleFromRangeMode(this.config.kiosk.confirm_service_time_range_minutes, this.config.kiosk.confirm_service_time_mode_minutes);
+              if (this.config.kiosk.timeout.enable_timeout && confirmTime > this.config.kiosk.timeout.confirmation_time_limit_minutes) {
+                this.timeouts++;
+                this.customersLost++;
+              } else {
+                this.kioskOnline++;
+                this.kitchenQueue.push({ ...cust, orderTime: minute + confirmTime });
+              }
+            } else {
+              const cashTime = this.sampleFromRangeMode(this.config.kiosk.cash_service_time_range_minutes, this.config.kiosk.cash_service_time_mode_minutes);
+              this.kioskCash++;
+              this.kitchenQueue.push({ ...cust, orderTime: minute + cashTime });
+            }
+          }
+        }
+      }
+
+      updateKitchen(minute) {
+        const c = this.config;
+        // start new kitchen orders
+        while (this.kitchenQueue.length > 0 && this.kitchenBusy.some(t => t <= 0)) {
+          const order = this.kitchenQueue.shift();
+          const freeIdx = this.kitchenBusy.findIndex(t => t <= 0);
+          const isPeak = this.isPeak(minute);
+          let prepTime = isPeak ? this.sampleFromRangeMode(c.kitchen.peak_prep_time_range_minutes, c.kitchen.peak_prep_time_mode_minutes)
+                               : this.sampleFromRangeMode(c.kitchen.regular_prep_time_range_minutes, c.kitchen.regular_prep_time_mode_minutes);
+          // bottleneck items (prob based on menu weights)
+          const bottleneckProb = c.menu.weights[0] + c.menu.weights[1]; // 0.5
+          if (Math.random() < bottleneckProb) {
+            prepTime += this.sampleFromRangeMode(c.kitchen.bottleneck_extra_range_minutes, c.kitchen.bottleneck_extra_mode_minutes);
+          }
+          this.kitchenBusy[freeIdx] = prepTime;
+          const kitchenWait = minute - order.orderTime;
+          if (kitchenWait >= 0) this.kitchenWaitSamples.push(kitchenWait);
+          order._kitchenIdx = freeIdx;
+          order._prepEndMinute = minute + prepTime;
+          if (!this._activeKitchenOrders) this._activeKitchenOrders = [];
+          this._activeKitchenOrders.push(order);
+        }
+        // progress kitchen timers and move to server queue
+        for (let i = this._activeKitchenOrders.length-1; i >=0; i--) {
+          const order = this._activeKitchenOrders[i];
+          const idx = order._kitchenIdx;
+          if (this.kitchenBusy[idx] > 0) this.kitchenBusy[idx] = Math.max(0, this.kitchenBusy[idx] - 1);
+          if (this.kitchenBusy[idx] <= 0) {
+            this._activeKitchenOrders.splice(i,1);
+            if (order.dineIn) {
+              this.serverQueue.push({ ...order, readyMinute: minute });
+            } else {
+              // takeout: directly served
+              const sysTime = minute - order.arrivalMinute;
+              this.systemTimes.push(sysTime);
+              this.customersServed++;
+            }
+          }
+        }
+      }
+
+      updateServers(minute) {
+        // assign servers to pending dine-in orders
+        while (this.serverQueue.length > 0 && this.serverBusy.some(t => t <= 0)) {
+          const order = this.serverQueue.shift();
+          const freeIdx = this.serverBusy.findIndex(t => t <= 0);
+          const deliveryTime = this.sampleFromRangeMode(this.config.server_delivery_time_range_minutes, 0.75); // mode approx
+          this.serverBusy[freeIdx] = deliveryTime;
+          order._serverIdx = freeIdx;
+          order._deliveryEnd = minute + deliveryTime;
+          if (!this._activeServerOrders) this._activeServerOrders = [];
+          this._activeServerOrders.push(order);
+        }
+        // progress server timers and seat customer
+        for (let i = this._activeServerOrders.length-1; i >=0; i--) {
+          const order = this._activeServerOrders[i];
+          const idx = order._serverIdx;
+          if (this.serverBusy[idx] > 0) this.serverBusy[idx] = Math.max(0, this.serverBusy[idx] - 1);
+          if (this.serverBusy[idx] <= 0) {
+            this._activeServerOrders.splice(i,1);
+            // seat at table
+            if (this.tableOccupied < this.config.total_tables) {
+              this.tableOccupied++;
+              const diningTime = this.sampleFromRangeMode(this.config.dining_time_range_minutes, this.config.dining_time_mode_minutes);
+              this.tableTimers.push(diningTime);
+              this.diningTimes.push(diningTime);
+              this.tableWaitSamples.push(0);
+              const sysTime = minute - order.arrivalMinute;
+              this.systemTimes.push(sysTime);
+              this.customersServed++;
+            } else {
+              this.tableQueue.push({ ...order, tableWaitStart: minute });
+            }
+          }
+        }
+      }
+
+      updateTables(minute) {
+        // progress dining timers
+        for (let i = this.tableTimers.length-1; i >=0; i--) {
+          this.tableTimers[i] = Math.max(0, this.tableTimers[i] - 1);
+          if (this.tableTimers[i] <= 0) {
+            this.tableTimers.splice(i,1);
+            this.tableOccupied = Math.max(0, this.tableOccupied - 1);
+            if (this.tableQueue.length > 0 && this.tableOccupied < this.config.total_tables) {
+              const next = this.tableQueue.shift();
+              const waitTable = minute - next.tableWaitStart;
+              if (waitTable > next.patience) { this.customersLost++; continue; }
+              this.tableWaitSamples.push(waitTable);
+              this.tableOccupied++;
+              const diningTime = this.sampleFromRangeMode(this.config.dining_time_range_minutes, this.config.dining_time_mode_minutes);
+              this.tableTimers.push(diningTime);
+              this.diningTimes.push(diningTime);
+              const sysTime = minute - next.arrivalMinute;
+              this.systemTimes.push(sysTime);
+              this.customersServed++;
+            }
+          }
+        }
+        // abandon impatient table waiters
+        for (let i = this.tableQueue.length-1; i >=0; i--) {
+          if (minute - this.tableQueue[i].tableWaitStart > this.tableQueue[i].patience) {
+            this.tableQueue.splice(i,1);
+            this.customersLost++;
+          }
+        }
+      }
+
+      getMetrics() {
+        const avgCashierQueue = this.queueLenCount > 0 ? this.queueLenSum / this.queueLenCount : 0;
+        const avgOccupancy = this.occupancyCount > 0 ? this.occupancySum / this.occupancyCount : 0;
+        const throughput = this.totalHoursSimulated > 0 ? this.customersServed / this.totalHoursSimulated : 0;
+        return {
+          total_customers_served: this.customersServed,
+          total_customers_lost: this.customersLost,
+          total_hours_simulated: this.totalHoursSimulated,
+          current_minute: this.currentMinute,
+          hourly_throughput: throughput,
+          avg_cashier_queue_len: avgCashierQueue,
+          max_cashier_queue_len: this.maxQueueLen,
+          kiosk_orders_created: this.kioskCreated,
+          kiosk_online_confirmations: this.kioskOnline,
+          kiosk_cash_payments: this.kioskCash,
+          manual_orders_count: this.manualOrders,
+          confirmation_timeouts: this.timeouts,
+          avg_cashier_wait_min: avg(this.cashierWaitSamples),
+          max_cashier_wait_min: max(this.cashierWaitSamples),
+          avg_kitchen_wait_min: avg(this.kitchenWaitSamples),
+          max_kitchen_wait_min: max(this.kitchenWaitSamples),
+          avg_table_wait_min: avg(this.tableWaitSamples),
+          max_table_wait_min: max(this.tableWaitSamples),
+          avg_cashier_service_time_min: avg(this.cashierServiceTimes),
+          max_cashier_service_time_min: max(this.cashierServiceTimes),
+          avg_kiosk_order_time_min: avg(this.kioskOrderTimes),
+          max_kiosk_order_time_min: max(this.kioskOrderTimes),
+          avg_dining_time_min: avg(this.diningTimes),
+          max_dining_time_min: max(this.diningTimes),
+          avg_system_time_min: avg(this.systemTimes),
+          avg_table_occupancy: avgOccupancy,
+          max_table_occupancy: this.maxOccupancyEver,
+          table_utilization_pct: (avgOccupancy / this.config.total_tables) * 100,
+        };
+      }
+    }
+
+    function avg(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+    function max(arr) { return arr.length ? Math.max(...arr) : 0; }
+
+    // ---------- Dashboard Initialization ----------
+    let sim = new MangInasalSim({
+      cashier_count: 3,
+      kiosk_count: 3,
+      regular_rate_per_minute: 0.29,
+      cook_count: 10,
+      total_tables: 39,
+      kiosk_order_prob: 0.87,
+      dine_in_prob: 0.8
+    });
+
+    let simInterval = null;
+    let simRunning = false;
+
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const speedSlider = document.getElementById('speedSlider');
+    const speedValue = document.getElementById('speedValue');
+    const cashierInput = document.getElementById('cashierInput');
+    const kioskInput = document.getElementById('kioskInput');
+    const arrivalInput = document.getElementById('arrivalInput');
+    const settingsIcon = document.getElementById('settingsIcon');
+    const modalOverlay = document.getElementById('modalOverlay');
+    const closeModal = document.getElementById('closeModal');
+    const kitchenStaffInput = document.getElementById('kitchenStaff');
+    const kioskRatioInput = document.getElementById('kioskRatio');
+    const dineInRatioInput = document.getElementById('dineInRatio');
+    const totalTablesInput = document.getElementById('totalTables');
+
+    const kpServed = document.getElementById('kpServed');
+    const kpLost = document.getElementById('kpLost');
+    const kpTime = document.getElementById('kpTime');
+    const kpHours = document.getElementById('kpHours');
+    const kpThroughput = document.getElementById('kpThroughput');
+    const kpAvgQueue = document.getElementById('kpAvgQueue');
+    const kpMaxQueue = document.getElementById('kpMaxQueue');
+
+    const lineCtx = document.getElementById('lineChart').getContext('2d');
+    const donutCtx = document.getElementById('donutChart').getContext('2d');
+    const histCtx = document.getElementById('histogramChart').getContext('2d');
+    const barCtx = document.getElementById('barChart').getContext('2d');
+
+    Chart.defaults.color = '#cbd5e1';
+    Chart.defaults.borderColor = '#334155';
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.plugins.tooltip.backgroundColor = '#1e293b';
+
+    const lineChart = new Chart(lineCtx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'Table Utilization %', data: [], borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', yAxisID: 'y', tension: 0.2, pointRadius: 0, borderWidth: 1.5 },
+          { label: 'Current Occupancy', data: [], borderColor: '#f59e0b', yAxisID: 'y1', tension: 0.2, pointRadius: 0, borderWidth: 1.5 },
+          { label: 'Max Occupancy', data: [], borderColor: '#ef4444', yAxisID: 'y1', borderDash: [4,4], pointRadius: 0, borderWidth: 1.2 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 200 },
+        scales: {
+          y: { type: 'linear', position: 'left', title: { display: true, text: 'Utilization %' }, min: 0, max: 100, grid: { color: '#334155' } },
+          y1: { type: 'linear', position: 'right', title: { display: true, text: 'Occupancy count' }, min: 0, grid: { drawOnChartArea: false } },
+          x: { title: { display: true, text: 'Simulation minute' }, grid: { display: false } }
+        }
+      }
+    });
+
+    const donutChart = new Chart(donutCtx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Manual Orders', 'Kiosk Online', 'Kiosk Cash', 'Timeouts'],
+        datasets: [{ data: [0,0,0,0], backgroundColor: ['#64748b','#22c55e','#3b82f6','#ef4444'], borderWidth: 0 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, animation: { animateRotate: true, duration: 300 }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } } }
+    });
+
+    const histChart = new Chart(histCtx, {
+      type: 'bar',
+      data: {
+        labels: ['0-1','1-2','2-3','3-4','4-5','5-6','6-8','8-10','10-15','15-20','20+'],
+        datasets: [
+          { label: 'Cashier Wait', data: [], backgroundColor: '#3b82f6' },
+          { label: 'Kitchen Wait', data: [], backgroundColor: '#f59e0b' },
+          { label: 'Table Wait', data: [], backgroundColor: '#22c55e' }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, animation: { duration: 200 }, scales: { y: { title: { display: true, text: 'Frequency' }, beginAtZero: true } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } } }
+    });
+
+    const barChart = new Chart(barCtx, {
+      type: 'bar',
+      data: {
+        labels: ['Cashier Service', 'Kiosk Order', 'Dining', 'System'],
+        datasets: [
+          { label: 'Avg (min)', data: [], backgroundColor: '#475569' },
+          { label: 'Max (min)', data: [], backgroundColor: '#ef4444' }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, animation: { duration: 200 }, scales: { y: { title: { display: true, text: 'Minutes' }, beginAtZero: true } }, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } } }
+    });
+
+    function computeHistogramBins(samples) {
+      const bins = new Array(11).fill(0);
+      samples.forEach(val => {
+        if (val < 1) bins[0]++; else if (val < 2) bins[1]++; else if (val < 3) bins[2]++;
+        else if (val < 4) bins[3]++; else if (val < 5) bins[4]++; else if (val < 6) bins[5]++;
+        else if (val < 8) bins[6]++; else if (val < 10) bins[7]++; else if (val < 15) bins[8]++;
+        else if (val < 20) bins[9]++; else bins[10]++;
+      });
+      return bins;
+    }
+
+    function formatTime(minute) {
+      const startHour = 10; // 10:00 AM
+      const totalMinutes = startHour * 60 + minute;
+      const h = Math.floor(totalMinutes / 60) % 24;
+      const m = totalMinutes % 60;
+      const ampm = h < 12 ? 'AM' : 'PM';
+      const displayHour = h % 12 === 0 ? 12 : h % 12;
+      return `${displayHour}:${m.toString().padStart(2,'0')} ${ampm}`;
+    }
+
+    function updateDashboard() {
+      const m = sim.getMetrics();
+      kpServed.textContent = m.total_customers_served;
+      kpLost.textContent = m.total_customers_lost;
+      kpTime.textContent = formatTime(m.current_minute);
+      kpHours.textContent = m.total_hours_simulated.toFixed(2);
+      kpThroughput.textContent = m.hourly_throughput.toFixed(2);
+      kpAvgQueue.textContent = m.avg_cashier_queue_len.toFixed(2);
+      kpMaxQueue.textContent = m.max_cashier_queue_len;
+
+      lineChart.data.labels = sim.timeLabels.map(t => t);
+      lineChart.data.datasets[0].data = sim.timeSeriesUtil;
+      lineChart.data.datasets[1].data = sim.timeSeriesOccupancy;
+      lineChart.data.datasets[2].data = sim.timeSeriesMaxOccupancy;
+      lineChart.update('none');
+
+      donutChart.data.datasets[0].data = [
+        m.manual_orders_count, m.kiosk_online_confirmations,
+        m.kiosk_cash_payments, m.confirmation_timeouts
+      ];
+      donutChart.update('none');
+
+      const cashierBins = computeHistogramBins(sim.cashierWaitSamples);
+      const kitchenBins = computeHistogramBins(sim.kitchenWaitSamples);
+      const tableBins = computeHistogramBins(sim.tableWaitSamples);
+      histChart.data.datasets[0].data = cashierBins;
+      histChart.data.datasets[1].data = kitchenBins;
+      histChart.data.datasets[2].data = tableBins;
+      histChart.update('none');
+
+      barChart.data.datasets[0].data = [
+        m.avg_cashier_service_time_min, m.avg_kiosk_order_time_min,
+        m.avg_dining_time_min, m.avg_system_time_min
+      ];
+      const maxSys = sim.systemTimes.length ? Math.max(...sim.systemTimes) : 0;
+      barChart.data.datasets[1].data = [
+        m.max_cashier_service_time_min, m.max_kiosk_order_time_min,
+        m.max_dining_time_min, maxSys
+      ];
+      barChart.update('none');
+    }
+
+    function getSpeedMultiplier() { return parseFloat(speedSlider.value); }
+
+    function startSimulation() {
+      if (simRunning) return;
+      simRunning = true;
+      startBtn.textContent = '⏸ Pause';
+      startBtn.classList.add('active');
+      const intervalMs = 1000 / getSpeedMultiplier();
+      simInterval = setInterval(() => {
+        sim.tick();
+        updateDashboard();
+      }, intervalMs);
+    }
+
+    function pauseSimulation() {
+      if (!simRunning) return;
+      simRunning = false;
+      startBtn.textContent = '▶ Start';
+      startBtn.classList.remove('active');
+      clearInterval(simInterval);
+      simInterval = null;
+    }
+
+    function applyQuickParams() {
+      const cashiers = parseInt(cashierInput.value) || 3;
+      const kiosks = parseInt(kioskInput.value) || 3;
+      const arrivalRatePerHour = parseInt(arrivalInput.value) || 17;
+      const regularRate = arrivalRatePerHour / 60;
+      sim.config.cashier_count = cashiers;
+      sim.config.kiosk.kiosk_count = kiosks;
+      sim.config.arrival.regular_rate_per_minute = regularRate;
+      // Resize arrays
+      while (sim.cashierBusy.length < cashiers) sim.cashierBusy.push(0);
+      if (sim.cashierBusy.length > cashiers) sim.cashierBusy.length = cashiers;
+      while (sim.kioskBusy.length < kiosks) sim.kioskBusy.push(0);
+      if (sim.kioskBusy.length > kiosks) sim.kioskBusy.length = kiosks;
+    }
+
+    function applyAdvancedParams() {
+      sim.config.cook_count = parseInt(kitchenStaffInput.value) || 10;
+      sim._kioskOrderProb = parseFloat(kioskRatioInput.value) || 0.87;
+      sim._dineInProb = parseFloat(dineInRatioInput.value) || 0.8;
+      sim.config.total_tables = parseInt(totalTablesInput.value) || 39;
+      while (sim.kitchenBusy.length < sim.config.cook_count) sim.kitchenBusy.push(0);
+      if (sim.kitchenBusy.length > sim.config.cook_count) sim.kitchenBusy.length = sim.config.cook_count;
+    }
+
+    function resetSimulation() {
+      pauseSimulation();
+      applyQuickParams();
+      applyAdvancedParams();
+      sim.resetState();
+      lineChart.data.labels = [];
+      lineChart.data.datasets.forEach(ds => ds.data = []);
+      donutChart.data.datasets[0].data = [0,0,0,0];
+      histChart.data.datasets.forEach(ds => ds.data = []);
+      barChart.data.datasets.forEach(ds => ds.data = []);
+      updateDashboard();
+    }
+
+    startBtn.addEventListener('click', () => { if (simRunning) pauseSimulation(); else startSimulation(); });
+    resetBtn.addEventListener('click', resetSimulation);
+    speedSlider.addEventListener('input', () => {
+      speedValue.textContent = getSpeedMultiplier() + 'x';
+      if (simRunning) { pauseSimulation(); startSimulation(); }
+    });
+    cashierInput.addEventListener('change', applyQuickParams);
+    kioskInput.addEventListener('change', applyQuickParams);
+    arrivalInput.addEventListener('change', applyQuickParams);
+    settingsIcon.addEventListener('click', () => modalOverlay.style.display = 'flex');
+    closeModal.addEventListener('click', () => modalOverlay.style.display = 'none');
+    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.style.display = 'none'; });
+    kitchenStaffInput.addEventListener('change', applyAdvancedParams);
+    kioskRatioInput.addEventListener('change', applyAdvancedParams);
+    dineInRatioInput.addEventListener('change', applyAdvancedParams);
+    totalTablesInput.addEventListener('change', applyAdvancedParams);
+
+    // Initialize with one tick to show data
+    resetSimulation();
+    sim.tick();
+    updateDashboard();
+  })();
+</script>
+</body>
+</html>
