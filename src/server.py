@@ -319,70 +319,73 @@ async def ws_handler(websocket):
     connected_clients.add(websocket)
     await _broadcast_state("paused")
     try:
-        async for raw in websocket:
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
+        try:
+            async for raw in websocket:
+                try:
+                    msg = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
 
-            action = msg.get("action")
+                action = msg.get("action")
 
-            if action == "play":
-                sim_runner.paused = False
-                await _broadcast_state("running")
+                if action == "play":
+                    sim_runner.paused = False
+                    await _broadcast_state("running")
 
-            elif action == "pause":
-                sim_runner.paused = True
-                await _broadcast_state("paused")
+                elif action == "pause":
+                    sim_runner.paused = True
+                    await _broadcast_state("paused")
 
-            elif action == "stop":
-                sim_runner.paused = True
-                sim_runner.running = False
-                await _broadcast_state("stopped")
+                elif action == "stop":
+                    sim_runner.paused = True
+                    sim_runner.running = False
+                    await _broadcast_state("stopped")
 
-            elif action == "reset":
-                sim_runner.reset_requested = True
-                sim_runner.paused = True
-                snapshot = {
-                    "type": "metrics",
-                    "data": {
-                        "total_customers_served": 0,
-                        "total_customers_lost": 0,
-                        "total_hours_simulated": 0,
-                        "current_minute": 0,
-                        "hourly_throughput": 0,
-                        "avg_cashier_queue_len": 0,
-                        "max_cashier_queue_len": 0,
-                        "kiosk_orders_created": 0,
-                        "kiosk_online_confirmations": 0,
-                        "kiosk_cash_payments": 0,
-                        "manual_orders_count": 0,
-                        "confirmation_timeouts": 0,
-                        "avg_cashier_wait_min": 0, "max_cashier_wait_min": 0,
-                        "avg_kitchen_wait_min": 0, "max_kitchen_wait_min": 0,
-                        "avg_table_wait_min": 0, "max_table_wait_min": 0,
-                        "avg_cashier_service_time_min": 0, "max_cashier_service_time_min": 0,
-                        "avg_kiosk_order_time_min": 0, "max_kiosk_order_time_min": 0,
-                        "avg_dining_time_min": 0, "max_dining_time_min": 0,
-                        "avg_system_time_min": 0,
-                        "avg_table_occupancy": 0, "max_table_occupancy": 0,
-                        "table_utilization_pct": 0,
-                        "all_time_max_queue_len": 0,
-                        "all_time_max_table_occupancy": 0,
-                        "all_time_max_table_util_pct": 0,
-                        "time_labels": [],
-                        "utilization_series": [],
-                        "occupancy_series": [],
-                        "hist_cashier_wait": [0]*11,
-                        "hist_kitchen_wait": [0]*11,
-                        "hist_table_wait": [0]*11,
-                    },
-                }
-                await _send_all(json.dumps(snapshot))
+                elif action == "reset":
+                    sim_runner.reset_requested = True
+                    sim_runner.paused = True
+                    snapshot = {
+                        "type": "metrics",
+                        "data": {
+                            "total_customers_served": 0,
+                            "total_customers_lost": 0,
+                            "total_hours_simulated": 0,
+                            "current_minute": 0,
+                            "hourly_throughput": 0,
+                            "avg_cashier_queue_len": 0,
+                            "max_cashier_queue_len": 0,
+                            "kiosk_orders_created": 0,
+                            "kiosk_online_confirmations": 0,
+                            "kiosk_cash_payments": 0,
+                            "manual_orders_count": 0,
+                            "confirmation_timeouts": 0,
+                            "avg_cashier_wait_min": 0, "max_cashier_wait_min": 0,
+                            "avg_kitchen_wait_min": 0, "max_kitchen_wait_min": 0,
+                            "avg_table_wait_min": 0, "max_table_wait_min": 0,
+                            "avg_cashier_service_time_min": 0, "max_cashier_service_time_min": 0,
+                            "avg_kiosk_order_time_min": 0, "max_kiosk_order_time_min": 0,
+                            "avg_dining_time_min": 0, "max_dining_time_min": 0,
+                            "avg_system_time_min": 0,
+                            "avg_table_occupancy": 0, "max_table_occupancy": 0,
+                            "table_utilization_pct": 0,
+                            "all_time_max_queue_len": 0,
+                            "all_time_max_table_occupancy": 0,
+                            "all_time_max_table_util_pct": 0,
+                            "time_labels": [],
+                            "utilization_series": [],
+                            "occupancy_series": [],
+                            "hist_cashier_wait": [0]*11,
+                            "hist_kitchen_wait": [0]*11,
+                            "hist_table_wait": [0]*11,
+                        },
+                    }
+                    await _send_all(json.dumps(snapshot))
 
-            elif action == "update_config":
-                params = msg.get("params", {})
-                sim_runner.apply_config_overrides(params)
+                elif action == "update_config":
+                    params = msg.get("params", {})
+                    sim_runner.apply_config_overrides(params)
+        except websockets.exceptions.ConnectionClosed:
+            pass
     finally:
         connected_clients.discard(websocket)
 
