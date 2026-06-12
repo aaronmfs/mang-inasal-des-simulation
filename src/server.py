@@ -45,10 +45,41 @@ def _ensure_metrics_key(report: dict, key: str, default: float = 0.0) -> float:
     return default
 
 
+def _compute_hist_bins(samples: list[float]) -> list[int]:
+    bins = [0] * 11
+    for val in samples:
+        if val < 1:
+            bins[0] += 1
+        elif val < 2:
+            bins[1] += 1
+        elif val < 3:
+            bins[2] += 1
+        elif val < 4:
+            bins[3] += 1
+        elif val < 5:
+            bins[4] += 1
+        elif val < 6:
+            bins[5] += 1
+        elif val < 8:
+            bins[6] += 1
+        elif val < 10:
+            bins[7] += 1
+        elif val < 15:
+            bins[8] += 1
+        elif val < 20:
+            bins[9] += 1
+        else:
+            bins[10] += 1
+    return bins
+
+
 def build_metrics_snapshot(
     metrics: Metrics,
     config: Config,
     now: float,
+    time_labels: list | None = None,
+    util_series: list | None = None,
+    occ_series: list | None = None,
 ) -> dict:
     report = metrics.report(show_kiosk=config.feature_kiosk)
     hours = now / 60.0
@@ -92,6 +123,12 @@ def build_metrics_snapshot(
         "all_time_max_queue_len": int(max_queue),
         "all_time_max_table_occupancy": int(max_occ),
         "all_time_max_table_util_pct": round(util_pct, 2),
+        "time_labels": time_labels if time_labels is not None else [],
+        "utilization_series": util_series if util_series is not None else [],
+        "occupancy_series": occ_series if occ_series is not None else [],
+        "hist_cashier_wait": _compute_hist_bins(metrics.cashier_wait_times),
+        "hist_kitchen_wait": _compute_hist_bins(metrics.kitchen_wait_times),
+        "hist_table_wait": _compute_hist_bins(metrics.table_wait_times),
     }
 
 
@@ -104,10 +141,12 @@ class SimRunner:
         self.metrics: Metrics | None = None
 
         self.running = False
-        self.paused = False
+        self.paused = True
         self.reset_requested = False
         self.speed = 1.0
         self.max_throughput = False
+        self._kiosk_disabled = False
+        self._saved_kiosk_count = None
 
         self._thread: threading.Thread | None = None
         self._on_tick = None
@@ -139,6 +178,15 @@ class SimRunner:
                 self.speed = float(overrides["speed"])
             if "max_throughput" in overrides:
                 self.max_throughput = bool(overrides["max_throughput"])
+            if "kiosk_disabled" in overrides:
+                disabled = bool(overrides["kiosk_disabled"])
+                if disabled and not self._kiosk_disabled:
+                    self._saved_kiosk_count = data.setdefault("kiosk", {}).get("kiosk_count", 0)
+                    data["kiosk"]["kiosk_count"] = 0
+                elif not disabled and self._kiosk_disabled and self._saved_kiosk_count is not None:
+                    data["kiosk"]["kiosk_count"] = self._saved_kiosk_count
+                    self._saved_kiosk_count = None
+                self._kiosk_disabled = disabled
 
     def _setup(self) -> None:
         random.seed(self.config.random_seed)
@@ -175,20 +223,19 @@ class SimRunner:
 
     def _build_snapshot(self) -> dict:
         now = self.env.now if self.env else 0
-        data = build_metrics_snapshot(self.metrics, self.config, now)
-
         self._time_labels.append(int(now))
-        avg_occ = data["avg_table_occupancy"]
-        self._util_series.append(data["table_utilization_pct"])
-        self._occ_series.append(avg_occ)
-
-        return {
-            "type": "metrics",
-            "data": data,
-            "time_labels": list(self._time_labels),
-            "utilization_series": list(self._util_series),
-            "occupancy_series": list(self._occ_series),
-        }
+        report = self.metrics.report(show_kiosk=self.config.feature_kiosk) if self.metrics else {}
+        util = _ensure_metrics_key(report, "table_utilization_pct")
+        occ = _ensure_metrics_key(report, "avg_table_occupancy")
+        self._util_series.append(util)
+        self._occ_series.append(occ)
+        data = build_metrics_snapshot(
+            self.metrics, self.config, now,
+            time_labels=list(self._time_labels),
+            util_series=list(self._util_series),
+            occ_series=list(self._occ_series),
+        )
+        return {"type": "metrics", "data": data}
 
     def loop(self, on_tick) -> None:
         self._on_tick = on_tick
@@ -259,6 +306,7 @@ async def _broadcast_state(status: str):
 async def ws_handler(websocket):
     global sim_runner
     connected_clients.add(websocket)
+    await _broadcast_state("paused")
     try:
         async for raw in websocket:
             try:
@@ -311,10 +359,13 @@ async def ws_handler(websocket):
                         "all_time_max_queue_len": 0,
                         "all_time_max_table_occupancy": 0,
                         "all_time_max_table_util_pct": 0,
+                        "time_labels": [],
+                        "utilization_series": [],
+                        "occupancy_series": [],
+                        "hist_cashier_wait": [0]*11,
+                        "hist_kitchen_wait": [0]*11,
+                        "hist_table_wait": [0]*11,
                     },
-                    "time_labels": [],
-                    "utilization_series": [],
-                    "occupancy_series": [],
                 }
                 await _send_all(json.dumps(snapshot))
 

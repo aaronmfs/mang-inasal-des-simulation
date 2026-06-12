@@ -308,7 +308,7 @@
     var rate = this.isPeak(minute) ? c.arrival.peak_rate_per_minute : c.arrival.regular_rate_per_minute;
     var arrivals = this.poisson(rate);
     for (var i = 0; i < arrivals; i++) {
-      var isKiosk = Math.random() < (this._kioskOrderProb || 0.87);
+      var isKiosk = c.kiosk.kiosk_count > 0 && Math.random() < (this._kioskOrderProb || 0.87);
       var dineIn = Math.random() < (this._dineInProb || 0.8);
       var patience = this.sampleFromRangeMode(c.customer_patience_range_minutes, c.customer_patience_mode_minutes);
       var cust = {
@@ -717,6 +717,7 @@
 
     // Chart instances
     this.charts = {};
+    this._backendHistValid = false;
 
     // DOM refs
     this.$ = {};
@@ -765,6 +766,7 @@
     $.dineInRatio = document.getElementById('dineInRatio');
     $.totalTables = document.getElementById('totalTables');
     $.smoothingToggle = document.getElementById('smoothingToggle');
+    $.kioskDisableToggle = document.getElementById('kioskDisableToggle');
     $.modalSpeedSlider = document.getElementById('modalSpeedSlider');
     $.modalSpeedValue = document.getElementById('modalSpeedValue');
     $.connStatus = document.getElementById('connStatus');
@@ -939,7 +941,28 @@
     this.$.smoothingToggle.addEventListener('change', function () {
       self.tween.enabled = self.$.smoothingToggle.checked;
       if (self.ws && self.ws.status === 'connected') {
-        self.ws.send('update_config', { animation_smoothing: self.tween.enabled });
+        self.ws.send('update_config', {
+          max_throughput: !self.$.smoothingToggle.checked,
+          animation_smoothing: self.$.smoothingToggle.checked
+        });
+      }
+      if (!self.$.smoothingToggle.checked && self.simRunning) {
+        self._runMaxThroughput();
+      }
+    });
+
+    this.$.kioskDisableToggle.addEventListener('change', function () {
+      var disabled = self.$.kioskDisableToggle.checked;
+      if (disabled) {
+        self.sim._kioskOrderProb = 0;
+      } else {
+        self.sim._kioskOrderProb = parseFloat(self.$.kioskRatio.value) || 0.87;
+      }
+      if (self.ws && self.ws.status === 'connected') {
+        self.ws.send('update_config', {
+          kiosk_disabled: disabled,
+          active_kiosks: disabled ? 0 : (parseInt(self.$.kioskInput.value, 10) || 3)
+        });
       }
     });
 
@@ -1009,6 +1032,7 @@
       },
       onMessage: function (msg) {
         if (msg.type === 'metrics' && msg.data) {
+          if (!self.simRunning) return;
           self.frozen = false;
           self._onBackendMetrics(msg.data);
         }
@@ -1035,8 +1059,6 @@
   };
 
   Dashboard.prototype._onBackendMetrics = function (data) {
-    // Update client-side sim state from backend for chart continuity
-    // Use data to update rolling window
     if (data.time_labels) {
       this.rollingLabels = data.time_labels.slice(-ROLLING_WINDOW_MINUTES);
     }
@@ -1047,7 +1069,13 @@
       this.rollingOccupancy = data.occupancy_series.slice(-ROLLING_WINDOW_MINUTES);
     }
 
-    // Update tween targets with backend metrics
+    if (data.hist_cashier_wait) {
+      this._backendHistCashier = data.hist_cashier_wait;
+      this._backendHistKitchen = data.hist_kitchen_wait || data.hist_cashier_wait;
+      this._backendHistTable = data.hist_table_wait || data.hist_cashier_wait;
+      this._backendHistValid = true;
+    }
+
     this._updateTweenTargets(data);
   };
 
@@ -1149,6 +1177,7 @@
   };
 
   Dashboard.prototype._resetCharts = function () {
+    this._backendHistValid = false;
     this.charts.line.data.labels = [];
     this.charts.line.data.datasets.forEach(function (ds) { ds.data = []; });
     this.charts.line.update('none');
@@ -1179,7 +1208,27 @@
       var metrics = self.sim.getMetrics();
       self._updateRollingWindow(metrics);
       self._updateTweenTargets(metrics);
-      self.simInterval = setTimeout(tick, 1000 / parseFloat(self.$.speedSlider.value));
+      var delay = self.tween.enabled ? (1000 / parseFloat(self.$.speedSlider.value)) : 0;
+      self.simInterval = setTimeout(tick, delay);
+    };
+    tick();
+  };
+
+  Dashboard.prototype._runMaxThroughput = function () {
+    var self = this;
+    if (!self.simRunning) return;
+    self._stopClientTick();
+    var tick = function () {
+      if (!self.simRunning) return;
+      if (self.tween.enabled) {
+        self._runClientTick();
+        return;
+      }
+      self.sim.tick();
+      var metrics = self.sim.getMetrics();
+      self._updateRollingWindow(metrics);
+      self._updateTweenTargets(metrics);
+      self.simInterval = setTimeout(tick, 0);
     };
     tick();
   };
@@ -1295,8 +1344,13 @@
     this.charts.line.data.datasets[2].data = maxOccData;
     this.charts.line.update('none');
 
-    // Histogram (use sim data if available)
-    if (this.sim) {
+    // Histogram (backend data takes priority, fallback to client sim)
+    if (this._backendHistValid) {
+      this.charts.hist.data.datasets[0].data = this._backendHistCashier;
+      this.charts.hist.data.datasets[1].data = this._backendHistKitchen;
+      this.charts.hist.data.datasets[2].data = this._backendHistTable;
+      this.charts.hist.update('none');
+    } else if (this.sim) {
       var cashierBins = computeHistogram(this.sim.cashierWaitSamples);
       var kitchenBins = computeHistogram(this.sim.kitchenWaitSamples);
       var tableBins = computeHistogram(this.sim.tableWaitSamples);
@@ -1339,6 +1393,7 @@
     var arrivalRate = parseFloat(this.$.arrivalInput.value) || 0.29;
 
     if (this.useBackend && this.ws && this.ws.status === 'connected') {
+      kiosks = this.$.kioskDisableToggle.checked ? 0 : kiosks;
       this.ws.send('update_config', {
         active_cashiers: cashiers,
         active_kiosks: kiosks,
@@ -1349,7 +1404,7 @@
 
     // Client-side
     this.sim.config.cashier_count = cashiers;
-    this.sim.config.kiosk.kiosk_count = kiosks;
+    this.sim.config.kiosk.kiosk_count = this.$.kioskDisableToggle.checked ? 0 : kiosks;
     this.sim.config.arrival.regular_rate_per_minute = arrivalRate;
     while (this.sim.cashierBusy.length < cashiers) this.sim.cashierBusy.push(0);
     if (this.sim.cashierBusy.length > cashiers) this.sim.cashierBusy.length = cashiers;
@@ -1363,13 +1418,14 @@
         kitchen_staff_capacity: parseInt(this.$.kitchenStaff.value, 10) || 10,
         total_table_capacity: parseInt(this.$.totalTables.value, 10) || 39,
         order_type_distribution: { kiosk: parseFloat(this.$.kioskRatio.value) || 0.87 },
-        dining_choice_distribution: { dine_in: parseFloat(this.$.dineInRatio.value) || 0.8 }
+        dining_choice_distribution: { dine_in: parseFloat(this.$.dineInRatio.value) || 0.8 },
+        kiosk_disabled: this.$.kioskDisableToggle.checked
       });
       return;
     }
 
     this.sim.config.cook_count = parseInt(this.$.kitchenStaff.value, 10) || 10;
-    this.sim._kioskOrderProb = parseFloat(this.$.kioskRatio.value) || 0.87;
+    this.sim._kioskOrderProb = this.$.kioskDisableToggle.checked ? 0 : (parseFloat(this.$.kioskRatio.value) || 0.87);
     this.sim._dineInProb = parseFloat(this.$.dineInRatio.value) || 0.8;
     this.sim.config.total_tables = parseInt(this.$.totalTables.value, 10) || 39;
     while (this.sim.kitchenBusy.length < this.sim.config.cook_count) this.sim.kitchenBusy.push(0);
