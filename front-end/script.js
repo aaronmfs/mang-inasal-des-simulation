@@ -24,14 +24,22 @@
 
   function lerp(a, b, t) { return a + (b - a) * t; }
 
-  function formatTime(minute) {
+  function formatTime(minute, use24hr) {
     var startHour = 10;
     var totalMinutes = startHour * 60 + minute;
     var h = Math.floor(totalMinutes / 60) % 24;
-    var m = totalMinutes % 60;
+    var m = Math.floor(totalMinutes % 60);
+    var s = minute % 1;
+    var secs = Math.min(59, Math.max(0, Math.round(s * 60)));
+    var mm = m < 10 ? '0' + m : '' + m;
+    var ss = secs < 10 ? '0' + secs : '' + secs;
+    if (use24hr) {
+      var hh = h < 10 ? '0' + h : '' + h;
+      return hh + ':' + mm + ':' + ss;
+    }
     var ampm = h < 12 ? 'AM' : 'PM';
-    var displayHour = h % 12 === 0 ? 12 : h % 12;
-    return displayHour + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+    var dh = h % 12 === 0 ? 12 : h % 12;
+    return dh + ':' + mm + ':' + ss + ' <span class="ampm">' + ampm + '</span>';
   }
 
   function getBinIndex(val) {
@@ -718,6 +726,7 @@
     // Chart instances
     this.charts = {};
     this._backendHistValid = false;
+    this._use24hr = false;
 
     // DOM refs
     this.$ = {};
@@ -767,6 +776,7 @@
     $.totalTables = document.getElementById('totalTables');
     $.smoothingToggle = document.getElementById('smoothingToggle');
     $.kioskDisableToggle = document.getElementById('kioskDisableToggle');
+    $.formatToggle = document.getElementById('formatToggle');
     $.modalSpeedSlider = document.getElementById('modalSpeedSlider');
     $.modalSpeedValue = document.getElementById('modalSpeedValue');
     $.connStatus = document.getElementById('connStatus');
@@ -880,6 +890,9 @@
       self.$.speedValue.textContent = val + 'x';
       self.$.modalSpeedSlider.value = val;
       self.$.modalSpeedValue.textContent = val + 'x';
+      if (self.ws && self.ws.status === 'connected') {
+        self.ws.send('update_config', { speed: val });
+      }
       if (self.simRunning) {
         self.pauseSimulation();
         self.startSimulation();
@@ -891,6 +904,9 @@
       self.$.modalSpeedValue.textContent = val + 'x';
       self.$.speedSlider.value = val;
       self.$.speedValue.textContent = val + 'x';
+      if (self.ws && self.ws.status === 'connected') {
+        self.ws.send('update_config', { speed: val });
+      }
       if (self.simRunning) {
         self.pauseSimulation();
         self.startSimulation();
@@ -964,6 +980,10 @@
           active_kiosks: disabled ? 0 : (parseInt(self.$.kioskInput.value, 10) || 3)
         });
       }
+    });
+
+    this.$.formatToggle.addEventListener('change', function () {
+      self._use24hr = self.$.formatToggle.checked;
     });
 
     // Live validation on input
@@ -1307,12 +1327,12 @@
 
   Dashboard.prototype._renderFromTween = function () {
     var t = this.tween;
-    var minute = Math.round(t.get('currentMinute'));
+    var minute = t.get('currentMinute');
 
     // KPI cards
     this.$.kpServed.textContent = Math.round(t.get('served'));
     this.$.kpLost.textContent = Math.round(t.get('lost'));
-    this.$.kpTime.textContent = formatTime(minute);
+    this.$.kpTime.innerHTML = formatTime(minute, this._use24hr);
     this.$.kpHours.textContent = t.get('hours').toFixed(2);
     this.$.kpThroughput.textContent = t.get('throughput').toFixed(2);
     this.$.kpAvgQueue.textContent = t.get('avgQueue').toFixed(2);
