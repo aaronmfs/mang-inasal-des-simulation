@@ -94,6 +94,7 @@ def build_metrics_snapshot(
     return {
         "total_customers_served": metrics.customers_served,
         "total_customers_lost": metrics.customers_lost,
+        "current_in_system": metrics.customers_entered - metrics.customers_served - metrics.customers_lost,
         "total_hours_simulated": round(hours, 2),
         "current_minute": int(now),
         "hourly_throughput": round(throughput, 2),
@@ -348,6 +349,7 @@ async def ws_handler(websocket):
                         "data": {
                             "total_customers_served": 0,
                             "total_customers_lost": 0,
+                            "current_in_system": 0,
                             "total_hours_simulated": 0,
                             "current_minute": 0,
                             "hourly_throughput": 0,

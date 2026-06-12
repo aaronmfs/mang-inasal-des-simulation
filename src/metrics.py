@@ -13,6 +13,7 @@ class Metrics:
         self.table_occupancy_samples: List[Tuple[float, int]] = []
         self.customers_served: int = 0
         self.customers_lost: int = 0
+        self.customers_entered: int = 0
         self.dining_times: List[float] = []
         self.kiosk_order_times: List[float] = []
         self.kiosk_orders_created: int = 0
@@ -37,6 +38,9 @@ class Metrics:
 
     def record_dining_time(self, duration: float) -> None:
         self.dining_times.append(duration)
+
+    def record_arrival(self) -> None:
+        self.customers_entered += 1
 
     def record_abandonment(self) -> None:
         self.customers_lost += 1
@@ -74,6 +78,9 @@ class Metrics:
 
         summary["total_customers_served"] = float(self.customers_served)
         summary["total_customers_lost"] = float(self.customers_lost)
+        summary["current_in_system"] = float(
+            self.customers_entered - self.customers_served - self.customers_lost
+        )
         summary["total_hours_simulated"] = float(self.sim_hours)
         summary["hourly_throughput"] = (
             self.customers_served / max(self.sim_hours, 1)

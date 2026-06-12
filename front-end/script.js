@@ -229,6 +229,7 @@
     this.currentMinute = 0;
     this.customersServed = 0;
     this.customersLost = 0;
+    this.customersEntered = 0;
     this.totalHoursSimulated = 0;
 
     this.cashierBusy = new Array(c.cashier_count).fill(0);
@@ -326,6 +327,7 @@
         patience: patience,
         lost: false
       };
+      this.customersEntered++;
       if (isKiosk) {
         this.processKioskArrival(cust);
       } else {
@@ -574,6 +576,7 @@
     return {
       total_customers_served: this.customersServed,
       total_customers_lost: this.customersLost,
+      current_in_system: this.customersEntered - this.customersServed - this.customersLost,
       total_hours_simulated: this.totalHoursSimulated,
       current_minute: this.currentMinute,
       hourly_throughput: throughput,
@@ -786,6 +789,7 @@
 
     $.kpServed = document.getElementById('kpServed');
     $.kpLost = document.getElementById('kpLost');
+    $.kpInSystem = document.getElementById('kpInSystem');
     $.kpTime = document.getElementById('kpTime');
     $.kpHours = document.getElementById('kpHours');
     $.kpThroughput = document.getElementById('kpThroughput');
@@ -1184,6 +1188,7 @@
     this.updateDisplay({
       total_customers_served: 0,
       total_customers_lost: 0,
+      current_in_system: 0,
       total_hours_simulated: 0,
       current_minute: 0,
       hourly_throughput: 0,
@@ -1303,6 +1308,7 @@
     this.tween.bulkSet({
       served: metrics.total_customers_served,
       lost: metrics.total_customers_lost,
+      currentInSystem: metrics.current_in_system,
       hours: metrics.total_hours_simulated,
       throughput: metrics.hourly_throughput,
       avgQueue: metrics.avg_cashier_queue_len,
@@ -1350,6 +1356,7 @@
     // KPI cards
     this.$.kpServed.textContent = Math.round(t.get('served'));
     this.$.kpLost.textContent = Math.round(t.get('lost'));
+    this.$.kpInSystem.textContent = Math.round(t.get('currentInSystem'));
     this.$.kpTime.textContent = formatTime(minute, this._use24hr, this._startHour, this._startMinute);
     this.$.kpHours.textContent = t.get('hours').toFixed(2);
     this.$.kpThroughput.textContent = t.get('throughput').toFixed(2);

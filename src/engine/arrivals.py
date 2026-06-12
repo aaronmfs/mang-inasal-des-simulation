@@ -28,6 +28,7 @@ def arrival_generator(
             items = config.generate_order()
             customer = Customer(env.now, items, config)
 
+        metrics.record_arrival()
         env.process(customer_lifecycle(
             env, config, customer, resources, metrics
         ))
