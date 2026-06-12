@@ -37,9 +37,9 @@
       var hh = h < 10 ? '0' + h : '' + h;
       return hh + ':' + mm + ':' + ss;
     }
-    var ampm = h < 12 ? 'AM' : 'PM';
+    var ampm = h < 12 ? ' AM' : ' PM';
     var dh = h % 12 === 0 ? 12 : h % 12;
-    return dh + ':' + mm + ':' + ss + ' <span class="ampm">' + ampm + '</span>';
+    return dh + ':' + mm + ':' + ss + ampm;
   }
 
   function getBinIndex(val) {
@@ -122,12 +122,13 @@
     for (var i = 0; i < this._listeners.length; i++) {
       this._listeners[i]();
     }
-    this._animId = requestAnimationFrame(this._tick.bind(this));
+    this._animId = requestAnimationFrame(this._boundTick);
   };
 
   TweenEngine.prototype.start = function () {
     if (this._animId) return;
-    this._tick();
+    this._boundTick = this._tick.bind(this);
+    this._boundTick();
   };
 
   TweenEngine.prototype.stop = function () {
@@ -726,6 +727,7 @@
     // Chart instances
     this.charts = {};
     this._backendHistValid = false;
+    this._dirtyCharts = false;
     this._use24hr = false;
 
     // DOM refs
@@ -1312,6 +1314,7 @@
       utilPct: metrics.table_utilization_pct,
       currentMinute: metrics.current_minute
     });
+    this._dirtyCharts = true;
   };
 
   // ============================================================
@@ -1332,7 +1335,7 @@
     // KPI cards
     this.$.kpServed.textContent = Math.round(t.get('served'));
     this.$.kpLost.textContent = Math.round(t.get('lost'));
-    this.$.kpTime.innerHTML = formatTime(minute, this._use24hr);
+    this.$.kpTime.textContent = formatTime(minute, this._use24hr);
     this.$.kpHours.textContent = t.get('hours').toFixed(2);
     this.$.kpThroughput.textContent = t.get('throughput').toFixed(2);
     this.$.kpAvgQueue.textContent = t.get('avgQueue').toFixed(2);
@@ -1341,6 +1344,8 @@
     // All-time high badges
     this.$.kpServed.classList.toggle('alltime-high', Math.round(t.get('served')) >= this.allTimeMax.served && this.allTimeMax.served > 0);
     this.$.kpLost.classList.toggle('alltime-high', Math.round(t.get('lost')) >= this.allTimeMax.lost && this.allTimeMax.lost > 0);
+
+    if (!this._dirtyCharts) return;
 
     // Donut chart
     this.charts.donut.data.datasets[0].data = [
@@ -1390,6 +1395,8 @@
       t.get('maxDining'), Math.max(t.get('maxCashierService'), t.get('maxKitchenWait'))
     ];
     this.charts.bar.update('none');
+
+    this._dirtyCharts = false;
   };
 
   // ============================================================
