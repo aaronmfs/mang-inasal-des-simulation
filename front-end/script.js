@@ -29,17 +29,14 @@
     var totalMinutes = startHour * 60 + minute;
     var h = Math.floor(totalMinutes / 60) % 24;
     var m = Math.floor(totalMinutes % 60);
-    var s = minute % 1;
-    var secs = Math.min(59, Math.max(0, Math.round(s * 60)));
     var mm = m < 10 ? '0' + m : '' + m;
-    var ss = secs < 10 ? '0' + secs : '' + secs;
     if (use24hr) {
       var hh = h < 10 ? '0' + h : '' + h;
-      return hh + ':' + mm + ':' + ss;
+      return hh + ':' + mm;
     }
     var ampm = h < 12 ? ' AM' : ' PM';
     var dh = h % 12 === 0 ? 12 : h % 12;
-    return dh + ':' + mm + ':' + ss + ampm;
+    return dh + ':' + mm + ampm;
   }
 
   function getBinIndex(val) {
@@ -1330,7 +1327,7 @@
 
   Dashboard.prototype._renderFromTween = function () {
     var t = this.tween;
-    var minute = t.get('currentMinute');
+    var minute = Math.round(t.get('currentMinute'));
 
     // KPI cards
     this.$.kpServed.textContent = Math.round(t.get('served'));
@@ -1345,7 +1342,8 @@
     this.$.kpServed.classList.toggle('alltime-high', Math.round(t.get('served')) >= this.allTimeMax.served && this.allTimeMax.served > 0);
     this.$.kpLost.classList.toggle('alltime-high', Math.round(t.get('lost')) >= this.allTimeMax.lost && this.allTimeMax.lost > 0);
 
-    if (!this._dirtyCharts) return;
+    // Skip chart updates when smoothing is off and no new data arrived
+    if (!this.tween.enabled && !this._dirtyCharts) return;
 
     // Donut chart
     this.charts.donut.data.datasets[0].data = [
