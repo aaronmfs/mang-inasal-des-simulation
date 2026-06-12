@@ -254,6 +254,7 @@ class SimRunner:
                 time.sleep(0.05)
                 continue
 
+            tick_start = time.perf_counter()
             self._tick()
 
             if self._on_tick:
@@ -261,8 +262,11 @@ class SimRunner:
 
             if self.max_throughput:
                 continue
-            wait = 1.0 / max(self.speed, 0.1)
-            time.sleep(wait)
+            elapsed = time.perf_counter() - tick_start
+            target = 1.0 / max(self.speed, 0.1)
+            remaining = target - elapsed
+            if remaining > 0:
+                time.sleep(remaining)
 
         self.running = False
 
