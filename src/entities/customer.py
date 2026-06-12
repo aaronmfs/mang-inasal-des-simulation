@@ -32,6 +32,7 @@ class Customer:
         self.order_status: str = "pending"
         self.confirmation_deadline: float = float("inf")
         self.manual_override: bool = False
+        self.paid: bool = False
 
         if config.feature_patience:
             self.patience_deadline: float = arrival_time + config.patience_time()

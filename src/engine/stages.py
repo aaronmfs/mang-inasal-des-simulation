@@ -23,7 +23,7 @@ def _race_request(
     req: Request,
     stage_name: str,
 ) -> bool:
-    if not config.feature_patience:
+    if not config.feature_patience or customer.paid:
         yield req
         return False
     remaining = customer.patience_deadline - env.now
@@ -50,6 +50,8 @@ def cashier_step(env, config, customer, resources, metrics):
         yield env.timeout(resources["cashier"].service_time())
         customer.cashier_end = env.now
         metrics.record_cashier_service_time(customer.cashier_end - customer.cashier_start)
+        metrics.record_manual_order()
+        customer.paid = True
     return False
 
 
@@ -125,6 +127,7 @@ def cashier_confirm_step(env, config, customer, resources, metrics):
 
         customer.cashier_end = env.now
         metrics.record_cashier_service_time(customer.cashier_end - customer.cashier_start)
+        customer.paid = True
     return False
 
 

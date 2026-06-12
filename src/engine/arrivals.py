@@ -20,7 +20,7 @@ def arrival_generator(
         inter_arrival = random.expovariate(rate)
         yield env.timeout(inter_arrival)
 
-        if config.feature_kiosk:
+        if config.feature_kiosk and config.num_kiosks > 0:
             customer = Customer(env.now, [], config)
             if config.feature_manual_override and random.random() < config.manual_override_probability:
                 customer.manual_override = True
