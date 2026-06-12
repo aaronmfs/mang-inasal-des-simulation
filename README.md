@@ -18,14 +18,14 @@ Arrival → Cashier Queue → Kitchen Prep → Release Claim → Seating Wait �
 Arrival → Kiosk → Cashier Confirm → Kitchen Prep → Release Claim → Seating Wait → Dining → Depart
 ```
 
-In kiosk mode, customers place orders at self-service kiosks and either pay online (quick cashier confirmation) or at the counter. A configurable `manual_override_probability` bypasses the kiosk for non-tech-savvy customers, routing them directly to a cashier for full order entry + payment.
+In kiosk mode, customers place orders at self-service kiosks and either pay online (quick cashier confirmation) or at the counter. A configurable `manual_override_probability` bypasses the kiosk for non-tech-savvy customers, routing them directly to a cashier for full order entry + payment. Kiosk state and capacity can be toggled at runtime via the web interface — no restart required.
 
 Each stage is parameterized with bounded probability distributions triangulated from interview data and direct observation:
 
 | Stage | Resource | Capacity | Distribution |
 |-------|----------|----------|-------------|
 | Arrival | — | — | NHPP (λ=0.29 regular, 0.58 peak) |
-| Kiosk *(optional)* | simpy.Resource | kiosk.kiosk_count (configurable, default 0) | triangular(1, 2, 5) min |
+| Kiosk *(optional)* | simpy.Resource | configurable via `kiosk.kiosk_count` | triangular(1, 2, 5) min |
 | Cashier | simpy.Resource | 3 counters | triangular(2, 3, 7) min / kiosk confirm triangular(0.5, 1, 1.5) min |
 | Kitchen | simpy.Resource | 10 stations | triangular(7, 7, 10) regular / triangular(15, 17, 20) peak + bottleneck surcharge |
 | Release | simpy.Resource *(optional)* | 4 servers | uniform(0.5, 1.0) min |
@@ -39,10 +39,15 @@ Customers have configurable patience limits: if wait time exceeds their sampled 
 
 ```
 config.json           — All simulation parameters (JSON, feature-flagged)
+front-end/            — Web dashboard (HTML, CSS, JS)
+  ├── index.html
+  ├── style.css
+  └── script.js
 src/
 ├── config.py         — JSON loader & dynamic property access
 ├── metrics.py        — Metrics collector & reporter
-├── main.py           — Entry point
+├── main.py           — CLI entry point (headless simulation)
+├── server.py         — WebSocket + HTTP server entry point (web dashboard)
 ├── base/             — Shared abstractions
 │   └── resource_manager.py — Resource base class (simpy.Resource wrapper)
 ├── entities/         — Resource wrappers
@@ -51,7 +56,7 @@ src/
 │   ├── kitchen.py    — KitchenManager (10 stations, dynamic prep)
 │   ├── server.py     — ServerManager (4 servers, optional release bottleneck)
 │   ├── dining.py     — DiningManager (39 tables)
-│   └── kiosk.py      — KioskManager (3 machines, experimental)
+│   └── kiosk.py      — KioskManager (kiosk.kiosk_count, experimental)
 └── engine/           — SimPy process generators
     ├── registry.py   — StageFunc type + BUILTIN / EXPERIMENTAL stage dicts
     ├── stages.py     — Individual step functions (cashier, kiosk, confirm, kitchen, release, dining)
@@ -64,35 +69,38 @@ src/
 
 - Python 3.10+
 - [SimPy](https://simpy.readthedocs.io/) 4.x
+- [websockets](https://websockets.readthedocs.io/) 13.0+ *(web dashboard only)*
 
-## Setup & Run
+## Setup
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\activate
-pip install simpy
+pip install -r requirements.txt
+```
+
+## Run
+
+### CLI (headless, no dashboard)
+
+```powershell
 python -m src.main
 ```
 
-Expected output (kiosk disabled):
+### Web Dashboard
+
+```powershell
+python -m src.server
 ```
-=======================================================
-  MANG INASAL SIMULATION -- DAILY REPORT
-=======================================================
-  --- SUMMARY ---
-  total_customers_served             :     268.00
-  total_customers_lost               :      65.00
-  total_hours_simulated              :      16.00
-  hourly_throughput                  :      16.75
-  --- DETAILS ---
-  kiosk_orders_created               :       0.00
-  kiosk_online_confirmations         :       0.00
-  kiosk_cash_payments                :       0.00
-  manual_orders_count                :       0.00
-  confirmation_timeouts              :       0.00
-  avg_cashier_wait_min               :       0.36
-  ...
-```
+
+Then open **http://0.0.0.0:8000** in your browser.
+
+The web interface provides a real-time dashboard with queue/occupancy charts, configurable simulation speed, and a settings panel to toggle resources (kiosk, cashiers, etc.) at runtime without restarting.
+
+## Screenshot
+
+<!-- TODO: Replace with actual dashboard screenshot -->
+![Dashboard](https://via.placeholder.com/800x450.png?text=Mang+Inasal+Simulation+Dashboard)
 
 ## Configuration
 
@@ -116,4 +124,4 @@ Toggle any flag between `true` / `false` and re-run — zero code changes requir
 | Monitoring interval | `monitoring_interval_minutes` | Frequency of queue/occupancy snapshots (minutes) |
 | Online payment probability | `kiosk.payment.online_payment_probability` | Likelihood a kiosk customer pays via app vs. cash |
 
-Kiosk state and capacity can be toggled at runtime via the front-end settings panel — no restart required.
+Kiosk state and capacity can be toggled at runtime via the settings panel in the web dashboard — no restart required.
