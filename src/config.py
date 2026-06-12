@@ -158,6 +158,22 @@ class Config:
     def supported_apps(self) -> list[str]:
         return self._data["kiosk"]["payment"]["supported_apps"]
 
+    @property
+    def monitoring_interval(self) -> float:
+        return self._data["monitoring_interval_minutes"]
+
+    @property
+    def min_order_items(self) -> int:
+        return self._data["menu"]["min_items"]
+
+    @property
+    def max_order_items(self) -> int:
+        return self._data["menu"]["max_items"]
+
+    @property
+    def kiosk_online_payment_probability(self) -> float:
+        return self._data["kiosk"]["payment"]["online_payment_probability"]
+
     # Menu
     @property
     def bottleneck_items(self) -> tuple[str, ...]:
@@ -172,7 +188,7 @@ class Config:
         return tuple(self._data["menu"]["weights"])
 
     def generate_order(self) -> list[str]:
-        num_items = random.randint(1, 3)
+        num_items = random.randint(self.min_order_items, self.max_order_items)
         return random.choices(
             list(self.menu_items),
             weights=list(self.menu_weights),

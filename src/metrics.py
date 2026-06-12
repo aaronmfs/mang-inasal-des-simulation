@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple
 
 
 class Metrics:
-    def __init__(self, sim_hours: int = 16, table_capacity: int = 39) -> None:
+    def __init__(self, sim_hours: int, table_capacity: int) -> None:
         self.cashier_wait_times: List[float] = []
         self.cashier_service_times: List[float] = []
         self.kitchen_wait_times: List[float] = []

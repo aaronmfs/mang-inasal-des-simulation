@@ -2,7 +2,7 @@
 
 Discrete-event simulation of a Mang Inasal restaurant branch, built with Python and SimPy.
 
-Models the complete customer journey from arrival to departure across cashier, kitchen, and dining stages under both regular and peak-hour conditions. Supports an experimental kiosk-first workflow with online payment confirmation and cashier manual override for non-kiosk customers.
+Models the complete customer journey from arrival to departure across cashier, kitchen, and dining stages under both regular and peak-hour conditions. Supports an experimental kiosk-first workflow with online payment confirmation and cashier manual override for non-kiosk customers. All simulation parameters are externalized to `config.json` — no hardcoded values in source code.
 
 ## How It Works
 
@@ -25,7 +25,7 @@ Each stage is parameterized with bounded probability distributions triangulated 
 | Stage | Resource | Capacity | Distribution |
 |-------|----------|----------|-------------|
 | Arrival | — | — | NHPP (λ=0.29 regular, 0.58 peak) |
-| Kiosk *(optional)* | simpy.Resource | 3 machines | triangular(1, 2, 5) min |
+| Kiosk *(optional)* | simpy.Resource | kiosk.kiosk_count (configurable, default 0) | triangular(1, 2, 5) min |
 | Cashier | simpy.Resource | 3 counters | triangular(2, 3, 7) min / kiosk confirm triangular(0.5, 1, 1.5) min |
 | Kitchen | simpy.Resource | 10 stations | triangular(7, 7, 10) regular / triangular(15, 17, 20) peak + bottleneck surcharge |
 | Release | simpy.Resource *(optional)* | 4 servers | uniform(0.5, 1.0) min |
@@ -107,3 +107,13 @@ Edit `config.json` at the project root. All parameters — arrival rates, resour
 | `kiosk_experimental_mode` | Enables kiosk-first workflow (kiosk → cashier confirm) |
 
 Toggle any flag between `true` / `false` and re-run — zero code changes required.
+
+### Additional Configurable Parameters
+
+| Parameter | Path in `config.json` | Description |
+|---|---|---|
+| Order item count | `menu.min_items` / `menu.max_items` | Number of items per customer order (randint range) |
+| Monitoring interval | `monitoring_interval_minutes` | Frequency of queue/occupancy snapshots (minutes) |
+| Online payment probability | `kiosk.payment.online_payment_probability` | Likelihood a kiosk customer pays via app vs. cash |
+
+Kiosk state and capacity can be toggled at runtime via the front-end settings panel — no restart required.

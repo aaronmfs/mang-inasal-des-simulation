@@ -66,7 +66,7 @@ def kiosk_step(env, config, customer, resources, metrics):
         kiosk_start = env.now
         yield env.timeout(resources["kiosk"].order_time())
         metrics.record_kiosk_order_time(env.now - kiosk_start)
-        if config.accept_online_cash_apps and random.random() < 0.5:
+        if config.accept_online_cash_apps and random.random() < config.kiosk_online_payment_probability:
             customer.payment_method = "kiosk_online"
             customer.payment_app = random.choice(config.supported_apps)
         else:

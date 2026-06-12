@@ -188,6 +188,13 @@ class SimRunner:
                     self._saved_kiosk_count = None
                 self._kiosk_disabled = disabled
 
+        if self.resources is not None:
+            if self.config.feature_kiosk and self.config.num_kiosks > 0:
+                if "kiosk" not in self.resources:
+                    self.resources["kiosk"] = KioskManager(self.env, self.config)
+            else:
+                self.resources.pop("kiosk", None)
+
     def _setup(self) -> None:
         random.seed(self.config.random_seed)
         self.env = simpy.Environment()

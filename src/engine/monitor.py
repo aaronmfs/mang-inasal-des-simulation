@@ -11,7 +11,7 @@ def monitor_process(
     metrics: Metrics,
 ) -> None:
     while True:
-        yield env.timeout(1.0)
+        yield env.timeout(config.monitoring_interval)
         if env.now >= config.sim_minutes:
             return
         metrics.snapshot_queue(

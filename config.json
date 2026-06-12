@@ -85,7 +85,9 @@
       0.05,
       0.1,
       0.1
-    ]
+    ],
+    "min_items": 1,
+    "max_items": 3
   },
   "kiosk": {
     "kiosk_count": 0,
@@ -117,10 +119,12 @@
     },
     "payment": {
       "accept_online_cash_apps": true,
+      "online_payment_probability": 0.5,
       "supported_apps": [
         "GCash",
         "Maya"
       ]
     }
-  }
+  },
+  "monitoring_interval_minutes": 1.0
 }
