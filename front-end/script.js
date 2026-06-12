@@ -25,7 +25,7 @@
   function lerp(a, b, t) { return a + (b - a) * t; }
 
   function formatTime(minute, use24hr, startHour, startMinute) {
-    startHour = startHour || 10;
+    startHour = startHour || 9;
     startMinute = startMinute || 0;
     var totalMinutes = startHour * 60 + startMinute + minute;
     var h = Math.floor(totalMinutes / 60) % 24;
@@ -727,7 +727,7 @@
     this._backendHistValid = false;
     this._dirtyCharts = false;
     this._use24hr = false;
-    this._startHour = 10;
+    this._startHour = 9;
     this._startMinute = 0;
 
     // DOM refs
@@ -779,6 +779,7 @@
     $.kioskDisableToggle = document.getElementById('kioskDisableToggle');
     $.formatToggle = document.getElementById('formatToggle');
     $.startTime = document.getElementById('startTime');
+    $.saveSettings = document.getElementById('saveSettings');
     $.modalSpeedSlider = document.getElementById('modalSpeedSlider');
     $.modalSpeedValue = document.getElementById('modalSpeedValue');
     $.connStatus = document.getElementById('connStatus');
@@ -991,6 +992,11 @@
 
     this.$.startTime.addEventListener('change', function () {
       self._applyStartTime();
+    });
+
+    this.$.saveSettings.addEventListener('click', function () {
+      self._applyStartTime();
+      self.$.modalOverlay.style.display = 'none';
     });
 
     // Live validation on input
