@@ -16,17 +16,6 @@ Arrival → Kiosk → Cashier Confirm → Kitchen Prep → Release Claim → Sea
 
 In kiosk mode, customers place orders at self-service kiosks and either pay online (quick cashier confirmation) or at the counter. A configurable `manual_override_probability` bypasses the kiosk for non-tech-savvy customers, routing them directly to a cashier for full order entry + payment. Kiosk state and capacity can be toggled at runtime via the web interface — no restart required.
 
-Each stage is parameterized with bounded probability distributions triangulated from interview data and direct observation:
-
-| Stage | Resource | Capacity | Distribution |
-|-------|----------|----------|-------------|
-| Arrival | — | — | NHPP (λ=0.29 regular, 0.58 peak) |
-| Kiosk *(optional)* | simpy.Resource | configurable via `kiosk.kiosk_count` | triangular(1, 2, 5) min |
-| Cashier | simpy.Resource | 3 counters | triangular(2, 3, 7) min / kiosk confirm triangular(0.5, 1, 1.5) min |
-| Kitchen | simpy.Resource | 10 stations | triangular(7, 7, 10) regular / triangular(15, 17, 20) peak + bottleneck surcharge |
-| Release | simpy.Resource *(optional)* | 4 servers | uniform(0.5, 1.0) min |
-| Dining | simpy.Resource | 39 tables | triangular(20, 30, 50) min |
-
 Peak hours (11AM–1PM lunch, 6PM–8PM dinner) increase both arrival rate and kitchen prep times. "Regular Chicken" and "Sisig" orders incur extra prep time.
 
 Customers have configurable patience limits: if wait time exceeds their sampled patience (triangular(15, 30, 60) min), they abandon the queue. Feature flags toggle patience, the server resource bottleneck, and the kiosk-first workflow independently.
@@ -35,130 +24,76 @@ Customers have configurable patience limits: if wait time exceeds their sampled 
 
 All simulation parameters are externalized to `config.json` — no hardcoded values in source code. The `Config` class in `src/config.py` loads this file at runtime and exposes each value via typed properties and distribution helper methods.
 
-### Feature Flags
-
-| Flag | JSON Path | Type | Default | Effect |
-|------|-----------|------|---------|--------|
-| Customer Patience | `features.customer_patience_and_abandonment` | bool | `true` | Customers abandon the queue if wait exceeds sampled patience |
-| Server Bottleneck | `features.server_resource_bottleneck` | bool | `true` | Release stage requires a server resource (capacity = `server_count`) |
-| Kiosk Experimental Mode | `features.kiosk_experimental_mode` | bool | `true` | Enables kiosk-first workflow (kiosk → cashier confirm) |
-
-### Simulation Configuration
-
-| Parameter | JSON Path | Type | Default | Description |
-|-----------|-----------|------|---------|-------------|
-| Schema Version | `_schema_version` | string | `"1.0"` | Schema version identifier |
-| Simulation Hours | `simulation_hours` | int | `16` | Total hours to simulate |
-| Random Seed | `random_seed` | int | `42` | Seed for reproducible random streams |
-| Cashier Count | `cashier_count` | int | `3` | Number of cashier counters |
-| Cook Count | `cook_count` | int | `10` | Number of kitchen stations / cooks |
-| Server Count | `server_count` | int | `4` | Number of release servers |
-| Total Tables | `total_tables` | int | `39` | Total dining tables |
-| Monitoring Interval | `monitoring_interval_minutes` | float | `1.0` | Interval (minutes) between queue/occupancy snapshot samples |
-
-### Arrival Process
-
-| Parameter | JSON Path | Type | Default | Distribution / Notes |
-|-----------|-----------|------|---------|---------------------|
-| Regular Arrival Rate | `arrival.regular_rate_per_minute` | float | `0.29` | Poisson rate (λ) during non-peak hours |
-| Peak Arrival Rate | `arrival.peak_rate_per_minute` | float | `0.58` | Poisson rate (λ) during peak hours |
-| Peak Windows | `arrival.peak_windows` | array | lunch (300–420), dinner (720–840) | Time windows (minutes from simulation start) when peak rates apply |
-
-### Cashier Service Time
-
-| Parameter | JSON Path | Type | Default | Distribution / Notes |
-|-----------|-----------|------|---------|---------------------|
-| Service Time Range | `cashier_service_time_range_minutes` | [float, float] | `[2.0, 7.0]` | Low/high bounds for triangular distribution |
-| Service Time Mode | `cashier_service_time_mode_minutes` | float | `3.0` | Mode for triangular distribution |
-
-### Kitchen
-
-| Parameter | JSON Path | Type | Default | Distribution / Notes |
-|-----------|-----------|------|---------|---------------------|
-| Regular Prep Range | `kitchen.regular_prep_time_range_minutes` | [float, float] | `[7.0, 10.0]` | Low/high bounds for regular-hour triangular distribution |
-| Regular Prep Mode | `kitchen.regular_prep_time_mode_minutes` | float | `7.0` | Mode for regular-hour triangular distribution |
-| Peak Prep Range | `kitchen.peak_prep_time_range_minutes` | [float, float] | `[15.0, 20.0]` | Low/high bounds for peak-hour triangular distribution |
-| Peak Prep Mode | `kitchen.peak_prep_time_mode_minutes` | float | `17.0` | Mode for peak-hour triangular distribution |
-| Bottleneck Items | `kitchen.bottleneck_items` | string[] | `["Regular Chicken", "Sisig"]` | Menu items incurring extra prep time |
-| Bottleneck Extra Range | `kitchen.bottleneck_extra_range_minutes` | [float, float] | `[3.0, 8.0]` | Low/high bounds for bottleneck surcharge triangular distribution |
-| Bottleneck Extra Mode | `kitchen.bottleneck_extra_mode_minutes` | float | `5.0` | Mode for bottleneck surcharge triangular distribution |
-
-### Server / Release
-
-| Parameter | JSON Path | Type | Default | Distribution / Notes |
-|-----------|-----------|------|---------|---------------------|
-| Delivery Time Range | `server_delivery_time_range_minutes` | [float, float] | `[0.5, 1.0]` | Low/high bounds for uniform distribution |
-
-### Dining
-
-| Parameter | JSON Path | Type | Default | Distribution / Notes |
-|-----------|-----------|------|---------|---------------------|
-| Dining Time Range | `dining_time_range_minutes` | [float, float] | `[20.0, 50.0]` | Low/high bounds for triangular distribution |
-| Dining Time Mode | `dining_time_mode_minutes` | float | `30.0` | Mode for triangular distribution |
-
-### Customer Patience
-
-| Parameter | JSON Path | Type | Default | Distribution / Notes |
-|-----------|-----------|------|---------|---------------------|
-| Patience Range | `customer_patience_range_minutes` | [float, float] | `[15.0, 60.0]` | Low/high bounds for triangular distribution |
-| Patience Mode | `customer_patience_mode_minutes` | float | `30.0` | Mode for triangular distribution |
-
-### Menu
-
-| Parameter | JSON Path | Type | Default | Description |
-|-----------|-----------|------|---------|-------------|
-| Items | `menu.items` | string[] | `["Regular Chicken", "Sisig", "Chicken BBQ", "Pork BBQ", "Lumpia", "Rice", "Drink"]` | Available menu items for order generation |
-| Weights | `menu.weights` | float[] | `[0.3, 0.2, 0.15, 0.1, 0.05, 0.1, 0.1]` | Selection probability weights for each menu item (must sum to 1.0) |
-| Min Items | `menu.min_items` | int | `1` | Minimum items per randomly generated order |
-| Max Items | `menu.max_items` | int | `3` | Maximum items per randomly generated order |
-
-### Kiosk
-
-| Parameter | JSON Path | Type | Default | Distribution / Notes |
-|-----------|-----------|------|---------|---------------------|
-| Kiosk Count | `kiosk.kiosk_count` | int | `0` | Number of self-service kiosk stations |
-| Order Time Range | `kiosk.order_time_range_minutes` | [float, float] | `[1.0, 5.0]` | Low/high bounds for kiosk order placement triangular distribution |
-| Order Time Mode | `kiosk.order_time_mode_minutes` | float | `2.0` | Mode for kiosk order placement triangular distribution |
-| Confirm Service Range | `kiosk.confirm_service_time_range_minutes` | [float, float] | `[0.5, 1.5]` | Low/high bounds for online payment confirmation triangular distribution |
-| Confirm Service Mode | `kiosk.confirm_service_time_mode_minutes` | float | `1.0` | Mode for online payment confirmation triangular distribution |
-| Cash Service Range | `kiosk.cash_service_time_range_minutes` | [float, float] | `[1.0, 3.0]` | Low/high bounds for kiosk cash payment at cashier triangular distribution |
-| Cash Service Mode | `kiosk.cash_service_time_mode_minutes` | float | `2.0` | Mode for kiosk cash payment at cashier triangular distribution |
-| Allow Manual Override | `kiosk.allow_cashier_manual_override` | bool | `true` | Enables routing non-kiosk customers directly to cashier |
-| Manual Override Probability | `kiosk.manual_override_probability` | float | `0.15` | Probability a customer bypasses kiosk for manual cashier order |
-| Manual Order Range | `kiosk.manual_order_time_range_minutes` | [float, float] | `[3.0, 8.0]` | Low/high bounds for manual cashier order triangular distribution |
-| Manual Order Mode | `kiosk.manual_order_time_mode_minutes` | float | `5.0` | Mode for manual cashier order triangular distribution |
-| Enable Timeout | `kiosk.timeout.enable_timeout` | bool | `true` | Enables confirmation deadline for kiosk orders |
-| Confirmation Time Limit | `kiosk.timeout.confirmation_time_limit_minutes` | float | `5.0` | Max minutes a kiosk order can wait for cashier confirmation before expiring |
-| Accept Online Cash Apps | `kiosk.payment.accept_online_cash_apps` | bool | `true` | Accept online cash app payments at kiosk |
-| Online Payment Probability | `kiosk.payment.online_payment_probability` | float | `0.5` | Probability a kiosk customer pays via online app vs. paying cash at counter |
-| Supported Apps | `kiosk.payment.supported_apps` | string[] | `["GCash", "Maya"]` | Available payment apps for online kiosk payments |
-
-### Web Dashboard / Server (hardcoded in `src/server.py`)
-
-These parameters are not in `config.json` but control the web dashboard server:
-
-| Parameter | Location | Type | Default | Description |
-|-----------|----------|------|---------|-------------|
-| HTTP Host | `server.py:27` | string | `"0.0.0.0"` | HTTP server bind address |
-| HTTP Port | `server.py:28` | int | `8000` | HTTP server port |
-| WebSocket Host | `server.py:29` | string | `"0.0.0.0"` | WebSocket server bind address |
-| WebSocket Port | `server.py:30` | int | `8765` | WebSocket server port |
-| Rolling Window | `server.py:31` | int | `5` | Number of data points in rolling time series charts |
-| Speed | `SimRunner.speed` | float | `1.0` | Simulation speed multiplier (1.0 = real-time) |
-| Max Throughput | `SimRunner.max_throughput` | bool | `false` | Run simulation at maximum speed (ignores speed multiplier) |
-| Paused | `SimRunner.paused` | bool | `true` | Initial paused state; simulation waits for "play" from dashboard |
-
-### Runtime Overrides (via WebSocket `update_config`)
-
-The web dashboard can override the following parameters at runtime via the `apply_config_overrides` method in `server.py:159`. No restart required:
-
-| Override Key | JSON Path Overridden | Description |
-|-------------|---------------------|-------------|
-| `active_cashiers` | `cashier_count` | Number of active cashier counters |
-| `active_kiosks` | `kiosk.kiosk_count` | Number of active kiosk stations |
-| `customer_arrival_rate` | `arrival.regular_rate_per_minute` | Regular arrival rate (λ) |
-| `kitchen_staff_capacity` | `cook_count` | Kitchen station count |
-| `total_table_capacity` | `total_tables` | Total dining tables |
-| `speed` | *(SimRunner)* | Simulation speed multiplier |
-| `max_throughput` | *(SimRunner)* | Run at max speed toggle |
-| `kiosk_disabled` | `kiosk.kiosk_count` (set to 0) | Temporarily disable all kiosks (saves and restores original count) |
+| Type | Name | Description and Unit | Distribution / Value |
+| :--- | :--- | :--- | :--- |
+| Stochastic process | Arrival Process | Customer inter-arrival times following a non-homogeneous Poisson process; peak windows in minutes from simulation start | NHPP λ=0.29 (regular), 0.58 (peak); peak windows: [300, 420] lunch, [720, 840] dinner |
+| Service distribution | Kiosk Service Time | Order placement time at self-service kiosk (minutes) | triangular(1, 2, 5); resource: simpy.Resource, capacity: kiosk.kiosk_count |
+| Service distribution | Cashier Service Time | Order and payment processing at cashier counter (minutes) | triangular(2, 3, 7) (full order); triangular(0.5, 1, 1.5) (kiosk confirm); resource: simpy.Resource, capacity: cashier_count (default 3) |
+| Service distribution | Kitchen Prep Time | Food preparation time (minutes) | regular: triangular(7, 7, 10); peak: triangular(15, 17, 20); + bottleneck surcharge triangular(3, 5, 8) for Regular Chicken / Sisig; resource: simpy.Resource, capacity: cook_count (default 10) |
+| Service distribution | Release Service Time | Food release / claim time (minutes) | uniform(0.5, 1.0); resource: simpy.Resource (optional), capacity: server_count (default 4) |
+| Service distribution | Dining Time | Time spent dining at table (minutes) | triangular(20, 30, 50); resource: simpy.Resource, capacity: total_tables (default 39) |
+| Service distribution | Customer Patience Tolerance | Max wait time before abandoning queue (minutes) | triangular(15, 30, 60) |
+| Feature flag | Customer Patience | Enables queue abandonment when wait exceeds sampled patience | JSON: `features.customer_patience_and_abandonment`, bool, default: `true` |
+| Feature flag | Server Bottleneck | Release stage requires a server resource (capacity = server_count) | JSON: `features.server_resource_bottleneck`, bool, default: `true` |
+| Feature flag | Kiosk Experimental Mode | Enables kiosk-first workflow (kiosk → cashier confirm) | JSON: `features.kiosk_experimental_mode`, bool, default: `true` |
+| Input parameter | Schema Version | Schema version identifier | JSON: `_schema_version`, string, default: `"1.0"` |
+| Input parameter | Simulation Hours | Total hours to simulate | JSON: `simulation_hours`, int, default: `16` |
+| Input parameter | Random Seed | Seed for reproducible random streams | JSON: `random_seed`, int, default: `42` |
+| Input parameter | Cashier Count | Number of cashier counters | JSON: `cashier_count`, int, default: `3` |
+| Input parameter | Cook Count | Number of kitchen stations / cooks | JSON: `cook_count`, int, default: `10` |
+| Input parameter | Server Count | Number of release servers | JSON: `server_count`, int, default: `4` |
+| Input parameter | Total Tables | Total dining tables | JSON: `total_tables`, int, default: `39` |
+| Input parameter | Monitoring Interval | Interval between queue / occupancy snapshot samples (minutes) | JSON: `monitoring_interval_minutes`, float, default: `1.0` |
+| Input parameter | Regular Arrival Rate | Poisson arrival rate (λ) during non-peak hours | JSON: `arrival.regular_rate_per_minute`, float, default: `0.29` |
+| Input parameter | Peak Arrival Rate | Poisson arrival rate (λ) during peak hours | JSON: `arrival.peak_rate_per_minute`, float, default: `0.58` |
+| Input parameter | Peak Windows | Time windows (minutes from simulation start) when peak rates apply | JSON: `arrival.peak_windows`, array, default: lunch (300–420), dinner (720–840) |
+| Input parameter | Cashier Service Time Range | Low / high bounds for cashier service time triangular distribution (minutes) | JSON: `cashier_service_time_range_minutes`, [float, float], default: `[2.0, 7.0]` |
+| Input parameter | Cashier Service Time Mode | Mode for cashier service time triangular distribution (minutes) | JSON: `cashier_service_time_mode_minutes`, float, default: `3.0` |
+| Input parameter | Kitchen Regular Prep Range | Low / high bounds for regular-hour triangular distribution (minutes) | JSON: `kitchen.regular_prep_time_range_minutes`, [float, float], default: `[7.0, 10.0]` |
+| Input parameter | Kitchen Regular Prep Mode | Mode for regular-hour triangular distribution (minutes) | JSON: `kitchen.regular_prep_time_mode_minutes`, float, default: `7.0` |
+| Input parameter | Kitchen Peak Prep Range | Low / high bounds for peak-hour triangular distribution (minutes) | JSON: `kitchen.peak_prep_time_range_minutes`, [float, float], default: `[15.0, 20.0]` |
+| Input parameter | Kitchen Peak Prep Mode | Mode for peak-hour triangular distribution (minutes) | JSON: `kitchen.peak_prep_time_mode_minutes`, float, default: `17.0` |
+| Input parameter | Bottleneck Items | Menu items incurring extra prep time | JSON: `kitchen.bottleneck_items`, string[], default: `["Regular Chicken", "Sisig"]` |
+| Input parameter | Bottleneck Extra Range | Low / high bounds for bottleneck surcharge triangular distribution (minutes) | JSON: `kitchen.bottleneck_extra_range_minutes`, [float, float], default: `[3.0, 8.0]` |
+| Input parameter | Bottleneck Extra Mode | Mode for bottleneck surcharge triangular distribution (minutes) | JSON: `kitchen.bottleneck_extra_mode_minutes`, float, default: `5.0` |
+| Input parameter | Release Delivery Time Range | Low / high bounds for uniform distribution of release server time (minutes) | JSON: `server_delivery_time_range_minutes`, [float, float], default: `[0.5, 1.0]` |
+| Input parameter | Dining Time Range | Low / high bounds for dining triangular distribution (minutes) | JSON: `dining_time_range_minutes`, [float, float], default: `[20.0, 50.0]` |
+| Input parameter | Dining Time Mode | Mode for dining triangular distribution (minutes) | JSON: `dining_time_mode_minutes`, float, default: `30.0` |
+| Input parameter | Customer Patience Range | Low / high bounds for patience triangular distribution (minutes) | JSON: `customer_patience_range_minutes`, [float, float], default: `[15.0, 60.0]` |
+| Input parameter | Customer Patience Mode | Mode for patience triangular distribution (minutes) | JSON: `customer_patience_mode_minutes`, float, default: `30.0` |
+| Input parameter | Menu Items | Available menu items for order generation | JSON: `menu.items`, string[], default: `["Regular Chicken", "Sisig", "Chicken BBQ", "Pork BBQ", "Lumpia", "Rice", "Drink"]` |
+| Input parameter | Menu Weights | Selection probability weights for each menu item (must sum to 1.0) | JSON: `menu.weights`, float[], default: `[0.3, 0.2, 0.15, 0.1, 0.05, 0.1, 0.1]` |
+| Input parameter | Min Items Per Order | Minimum items per randomly generated order | JSON: `menu.min_items`, int, default: `1` |
+| Input parameter | Max Items Per Order | Maximum items per randomly generated order | JSON: `menu.max_items`, int, default: `3` |
+| Input parameter | Kiosk Count | Number of self-service kiosk stations | JSON: `kiosk.kiosk_count`, int, default: `0` |
+| Input parameter | Kiosk Order Time Range | Low / high bounds for kiosk order placement triangular distribution (minutes) | JSON: `kiosk.order_time_range_minutes`, [float, float], default: `[1.0, 5.0]` |
+| Input parameter | Kiosk Order Time Mode | Mode for kiosk order placement triangular distribution (minutes) | JSON: `kiosk.order_time_mode_minutes`, float, default: `2.0` |
+| Input parameter | Kiosk Confirm Service Range | Low / high bounds for online payment confirmation triangular distribution (minutes) | JSON: `kiosk.confirm_service_time_range_minutes`, [float, float], default: `[0.5, 1.5]` |
+| Input parameter | Kiosk Confirm Service Mode | Mode for online payment confirmation triangular distribution (minutes) | JSON: `kiosk.confirm_service_time_mode_minutes`, float, default: `1.0` |
+| Input parameter | Kiosk Cash Service Range | Low / high bounds for kiosk cash payment at cashier triangular distribution (minutes) | JSON: `kiosk.cash_service_time_range_minutes`, [float, float], default: `[1.0, 3.0]` |
+| Input parameter | Kiosk Cash Service Mode | Mode for kiosk cash payment at cashier triangular distribution (minutes) | JSON: `kiosk.cash_service_time_mode_minutes`, float, default: `2.0` |
+| Input parameter | Allow Manual Override | Enables routing non-kiosk customers directly to cashier | JSON: `kiosk.allow_cashier_manual_override`, bool, default: `true` |
+| Input parameter | Manual Override Probability | Probability a customer bypasses kiosk for manual cashier order | JSON: `kiosk.manual_override_probability`, float, default: `0.15` |
+| Input parameter | Manual Order Range | Low / high bounds for manual cashier order triangular distribution (minutes) | JSON: `kiosk.manual_order_time_range_minutes`, [float, float], default: `[3.0, 8.0]` |
+| Input parameter | Manual Order Mode | Mode for manual cashier order triangular distribution (minutes) | JSON: `kiosk.manual_order_time_mode_minutes`, float, default: `5.0` |
+| Input parameter | Enable Kiosk Timeout | Enables confirmation deadline for kiosk orders | JSON: `kiosk.timeout.enable_timeout`, bool, default: `true` |
+| Input parameter | Confirmation Time Limit | Max minutes a kiosk order can wait for cashier confirmation before expiring | JSON: `kiosk.timeout.confirmation_time_limit_minutes`, float, default: `5.0` |
+| Input parameter | Accept Online Cash Apps | Accept online cash app payments at kiosk | JSON: `kiosk.payment.accept_online_cash_apps`, bool, default: `true` |
+| Input parameter | Online Payment Probability | Probability a kiosk customer pays via online app vs. cash at counter | JSON: `kiosk.payment.online_payment_probability`, float, default: `0.5` |
+| Input parameter | Supported Payment Apps | Available payment apps for online kiosk payments | JSON: `kiosk.payment.supported_apps`, string[], default: `["GCash", "Maya"]` |
+| Input parameter | HTTP Host | HTTP server bind address | Location: `server.py:27`, string, default: `"0.0.0.0"` |
+| Input parameter | HTTP Port | HTTP server port | Location: `server.py:28`, int, default: `8000` |
+| Input parameter | WebSocket Host | WebSocket server bind address | Location: `server.py:29`, string, default: `"0.0.0.0"` |
+| Input parameter | WebSocket Port | WebSocket server port | Location: `server.py:30`, int, default: `8765` |
+| Input parameter | Rolling Window | Number of data points in rolling time series charts | Location: `server.py:31`, int, default: `5` |
+| Input parameter | Simulation Speed | Simulation speed multiplier (1.0 = real-time) | Location: `SimRunner.speed`, float, default: `1.0` |
+| Input parameter | Max Throughput | Run simulation at maximum speed (ignores speed multiplier) | Location: `SimRunner.max_throughput`, bool, default: `false` |
+| Input parameter | Initial Paused State | Initial paused state; simulation waits for play from dashboard | Location: `SimRunner.paused`, bool, default: `true` |
+| Runtime override | active_cashiers | Number of active cashier counters | Overrides JSON: `cashier_count` |
+| Runtime override | active_kiosks | Number of active kiosk stations | Overrides JSON: `kiosk.kiosk_count` |
+| Runtime override | customer_arrival_rate | Regular arrival rate (λ) | Overrides JSON: `arrival.regular_rate_per_minute` |
+| Runtime override | kitchen_staff_capacity | Kitchen station count | Overrides JSON: `cook_count` |
+| Runtime override | total_table_capacity | Total dining tables | Overrides JSON: `total_tables` |
+| Runtime override | speed | Simulation speed multiplier | Overrides `SimRunner.speed` |
+| Runtime override | max_throughput | Run at max speed toggle | Overrides `SimRunner.max_throughput` |
+| Runtime override | kiosk_disabled | Temporarily disable all kiosks (saves and restores original count) | Sets JSON: `kiosk.kiosk_count` to 0 |
